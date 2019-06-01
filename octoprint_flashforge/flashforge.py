@@ -43,8 +43,8 @@ class FlashForge(object):
 			try:
 				self._handle.claimInterface(0)
 				# self.gcodecmd("M601 S0")
-			except:
-				raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use')
+			except usb1.USBError as usberror:
+				raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
 		else:
 			self._logger.debug("No FlashForge printer found")
 			raise FlashForgeError('No FlashForge Printer found')
@@ -109,12 +109,8 @@ class FlashForge(object):
 			cmd_done = False
 			while not cmd_done:
 				newdata = self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, int(self._read_timeout * 1000.0)).decode()
-
-				if newdata.strip() == 'ok':
+				if newdata.strip().endswith('ok'):
 					cmd_done = True
-				elif newdata.strip().endswith('ok'):
-					cmd_done = True
-
 				data = data + newdata
 
 			# decode data
@@ -123,10 +119,12 @@ class FlashForge(object):
 			datalines = data.splitlines()
 			for i, line in enumerate(datalines):
 				self._incoming.put(line)
+
 				if not line.find("CMD M20") == -1 and datalines[i+1] and datalines[i+1] == "ok":
 					# fetch SD card list does not get anything so fake out a result
 					self._incoming.put('Begin file list')
 					self._incoming.put('End file list')
+
 			return self._incoming.get_nowait()
 
 		except usb1.USBError as usberror:
@@ -148,11 +146,7 @@ class FlashForge(object):
 	def close(self):
 		self._logger.debug("FlashForge.close()")
 		self._incoming = None
-
-
-	def __del__(self):
-		self._logger.debug("FlashForge.__del__()")
 		try:
 			self._handle.releaseInterface(0)
-		except:
-			pass
+		except usb1.USBError as usberror:
+			raise FlashForgeError('Error releasing USB', usberror)
