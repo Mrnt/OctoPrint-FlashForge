@@ -1,0 +1,14 @@
+*.tar.bz2
+*.tar.gz
+*.7z
+*.pyc
+*.zip
+*.exe
+*.swp
+*.iml
+.idea
+.DS_Store
+.editorconfig
+*.egg-info
+*.orig
+*.codekit
