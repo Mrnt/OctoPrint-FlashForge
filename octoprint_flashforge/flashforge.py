@@ -30,8 +30,8 @@ class FlashForge(object):
 
 		# USB ID's - device ID will need to be changed to match printer model
 		self.vendorid = 0x2b71		# FlashForge
-		self.deviceid = 0x00ff		# Dreamer
-		# self.deviceid = 0x0001	# PowerSpec Ultra
+		self.deviceid = 0x0001		# Dreamer
+		# self.deviceid = 0x00ff	# PowerSpec Ultra
 
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
