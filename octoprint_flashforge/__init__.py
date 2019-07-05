@@ -14,7 +14,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	def __init__(self):
 		import logging
-		#logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
 		self._initialized = False
@@ -111,14 +110,13 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 						 **kwargs):
 		import threading
 		from octoprint import util as util
-		from octoprint.util import comm as comm
 
 		gcode = ""
 		file_size = 0
 		remote_name = ""
 
 
-		def process():
+		def process_upload():
 			error = ""
 
 			# rewrite:
@@ -129,7 +127,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.makeexclusive(True)
 			error = "could not start tx"
 
-			ok, answer = self._serial_obj.send_and_wait("M28 {} 0:/user/{}".format(file_size, remote_name), 5000)
+			# make sure heaters are off
+			self._serial_obj.sendcommand("M104 S0 T0")
+			self._serial_obj.sendcommand("M104 S0 T1")
+			self._serial_obj.sendcommand("M140 S0")
+
+			ok, answer = self._serial_obj.sendcommand("M28 {} 0:/user/{}".format(file_size, remote_name), 5000)
 			if not ok:
 				error = "file transfer not started {}".format(answer)
 			else:
@@ -137,14 +140,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				error = ""
 
 				while chunk_start_index < file_size:
-					#if self.stop_flag:
-					#	return False
 					chunk_end_index = min(chunk_start_index + self.FILE_PACKET_SIZE, file_size)
 					chunk = gcode[chunk_start_index:chunk_end_index]
 					if not chunk:
 						error = "unexpected eof"
 						break
-					if self._serial_obj.writeraw(chunk):#, endpoint=self.connection.file_transfer_endpoint_out, raw=True):
+					if self._serial_obj.writeraw(chunk):
 						counter += 1
 						if counter > 0:
 							counter = 0
@@ -157,31 +158,24 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					chunk_start_index += self.FILE_PACKET_SIZE
 
 			if not error:
-				if self._serial_obj.send_and_wait("M29", 10000):
-					ok, answer = self._serial_obj.send_and_wait("M23 0:/user/{}".format(remote_name), 10000)
-					if not answer:
-						error = "Printer did not answer to file print M23 {}".format(answer)
-					elif "Disk read error" in answer:
-						error = "Disk read error"
-					elif "File selected" in answer:
+				if self._serial_obj.sendcommand("M29", 10000)[0]:
+					ok, answer = self._serial_obj.sendcommand("M23 0:/user/{}".format(remote_name))
+					if "File selected" in answer:
 						self._logger.debug("And done!")
-
-						self._comm.external_streaming(False)
-						self._serial_obj._fileTX = False
 
 						sd_upload_succeeded(filename, remote_name, 10)
 						self._serial_obj.makeexclusive(False)
 						return
-
+					elif "Disk read error" in answer:
+						error = "Disk read error"
+					else:
+						error = "Printer did respond to file print M23 {}".format(answer)
+				else:
+					error = "File transfer incomplete"
 
 			self._logger.debug("Upload failed: {}".format(error))
-
-			self._comm.external_streaming(False)
-			#self._serial_obj._fileTX = False
-
 			sd_upload_failed(filename, remote_name, 10)
 			self._serial_obj.makeexclusive(False)
-
 			raise FlashForgeError(error, None)
 
 		if self._serial_obj:
@@ -190,79 +184,21 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 								  existing_filenames=existingSdFiles,
 								  extension="gx",
 								  whitelisted_extensions=["gx"])
-			#file = comm.StreamingGcodeFileInformation(path, filename, remote_name)
-			#self._comm._currentFile = file
 
 			file = open(path, "r")
 			gcode = file.read()
 			file_size = len(gcode)
 			file.close()
 
-
-
-			#file.start()
 			self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
 			sd_upload_started(filename, remote_name)
 
-			#printer.on_comm_file_transfer_started(filename,
-			#							  remote_name,
-			#							  file.getFilesize(),
-			#							  user=file.getUser())
-
-			#self._comm.external_streaming(True)
-			#self._serial_obj._fileTX = True
-
-			"""
-			# make sure heaters are off
-			self._serial_obj.send_and_wait("M104 S0 T0")
-			self._serial_obj.send_and_wait("M104 S0 T1")
-			self._serial_obj.send_and_wait("M140 S0")
-			
-			if self._serial_obj.send_and_wait("M28 {} 0:/user/{}".format(file_size, remote_name)):
-				self._logger.debug("M28 success")
-				thread = threading.Thread(target=process)
-				thread.daemon = True
-				thread.start()
-			else:
-				self._logger.debug("Upload failed to get M28 response")
-				self._comm.external_streaming(False)
-				self._serial_obj._fileTX = False
-				sd_upload_failed(filename, remote_name, 10)
-				self._serial_obj.makeexclusive(False)
-			"""
-			thread = threading.Thread(target=process)
+			thread = threading.Thread(target=process_upload, name="SD Uploader")
 			thread.daemon = True
 			thread.start()
 
 			return remote_name
 
-
-	def timedupload_to_sd(self, printer, filename, path, sd_upload_started, sd_upload_succeeded, sd_upload_failed, *args, **kwargs):
-		import threading
-		import time
-
-		remote_name = printer._get_free_remote_name(filename)
-		self._logger.info("Starting dummy SDCard upload from {} to {}".format(filename, remote_name))
-
-		#self._comm.external_streaming(True)
-		self._serial_obj.makeexclusive(True)
-		#self._serial_obj._fileTX = True
-		sd_upload_started(filename, remote_name)
-
-		def process():
-			self._logger.info("Sleeping 10s...")
-			time.sleep(10)
-			self._logger.info("And done!")
-			#self._comm.external_streaming(False)
-			#self._serial_obj._fileTX = False
-			sd_upload_succeeded(filename, remote_name, 10)
-			self._serial_obj.makeexclusive(False)
-
-		thread = threading.Thread(target=process)
-		thread.daemon = True
-		thread.start()
-
-		return remote_name
 
 
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
@@ -279,7 +215,6 @@ def __plugin_load__():
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.transport.serial.factory": __plugin_implementation__.printer_factory,
 		"octoprint.filemanager.extension_tree": __plugin_implementation__.get_extension_tree,
-		#"octoprint.printer.sdcardupload": __plugin_implementation__.timedupload_to_sd,
 		"octoprint.printer.sdcardupload": __plugin_implementation__.upload_to_sd
 	}
 
