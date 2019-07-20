@@ -1,7 +1,6 @@
 import usb1
 import threading
 
-
 try:
 	import queue
 except ImportError:
@@ -15,7 +14,6 @@ class FlashForgeError(Exception):
 		self.error = error
 
 
-
 class FlashForge(object):
 	ENDPOINT_CMD_IN = 0x81
 	ENDPOINT_CMD_OUT = 0x01
@@ -24,15 +22,10 @@ class FlashForge(object):
 	BUFFER_SIZE = 128
 
 
-	def __init__(self, plugin, comm, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
+	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
 		import logging
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("FlashForge.__init__()")
-
-		# USB ID's - device ID will need to be changed to match printer model
-		self.vendorid = 0x2b71		# FlashForge
-		#self.deviceid = 0x0001		# Dreamer
-		self.deviceid = 0x00ff		# PowerSpec Ultra
 
 		self._plugin = plugin
 		self._comm = comm
@@ -43,7 +36,7 @@ class FlashForge(object):
 		self._writelock = threading.Lock()
 
 		self._context = usb1.USBContext()
-		self._handle = self._context.openByVendorIDAndProductID(self.vendorid, self.deviceid)
+		self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
 		if self._handle:
 			try:
 				self._handle.claimInterface(0)
@@ -87,16 +80,6 @@ class FlashForge(object):
 
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
-
-		# change the default hello
-		if len(data) == 0 or data.find("M110") != -1:
-			# replace the default hello command with something recognized
-			data = "M601 S0"
-
-		# FlashForge uses "M107" to turn fan off not "M106 S0"
-		elif data.find("M106") != -1:
-			if "S0" in data:
-				data = "M107"
 
 		try:
 			self._logger.debug("FlashForge.write() {0}".format(data))

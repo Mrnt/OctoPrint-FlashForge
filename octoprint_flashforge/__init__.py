@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import absolute_import
 
+import usb1
 import octoprint.plugin
 from . import flashforge
 
@@ -9,6 +10,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.AssetPlugin,
                        octoprint.plugin.TemplatePlugin):
 
+
+	FLASHFORGE_ID = 0x2b71 #FlashForge USB vendor ID
+	PRINTER_IDS = {123:"Finder", 0x0001:"Dreamer", 0x00ff:"PowerSpec Ultra"}
 	FILE_PACKET_SIZE = 1024 * 4
 
 
@@ -21,6 +25,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 		self._currentFile = None
 		self._upload_percent = 0
+		self.device_id = 0
 
 
 	# internal initialize
@@ -74,6 +79,20 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		)
 
 
+	def detect_printer(self):
+		usbcontext = usb1.USBContext()
+		for device in usbcontext.getDeviceIterator(skip_on_error=True):
+			if device.getVendorID() == self.FLASHFORGE_ID:
+				device_id = device.getProductID()
+				self._logger.debug("Found device ID {}".format(device_id))
+				if device_id in self.PRINTER_IDS:
+					self._logger.debug("Found a {}".format(self.PRINTER_IDS[device_id]))
+					self.device_id = device_id
+					break
+		if self.device_id == 0:
+			raise FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.", None)
+
+
 	# main serial connection hook
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
 
@@ -83,9 +102,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("printer_factory")
 		self._logger.debug("printer_factory port {}s".format(port))
 
-		from . import flashforge
+		self.detect_printer()
+
 		self._comm = comm
-		serial_obj = flashforge.FlashForge(self, comm, read_timeout=float(read_timeout))
+		serial_obj = flashforge.FlashForge(self, comm, self.FLASHFORGE_ID, self.device_id, read_timeout=float(read_timeout))
 		return serial_obj
 
 
@@ -105,16 +125,36 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 
 
-	# stub for uploading files directly to SD card
+	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		if self._serial_obj and gcode:
+			# use M107 for fan off
+			if gcode == "M106":
+				if "S0" in cmd:
+					cmd = "M107"
+
+			# change the default hello
+			elif gcode == "M110":
+				cmd = "M601 S0"
+
+		return cmd
+
+
+	def sending_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		from octoprint.util import monotonic_time
+
+		if gcode:
+			if gcode == "M6" or gcode == "M7":
+				self._comm._heatupWaitStartTime = monotonic_time()
+				self._comm._long_running_command = True
+				self._comm._heating = True
+
+
+	# uploading files directly to internal SD card
 	def upload_to_sd(self, printer, filename, path, sd_upload_started, sd_upload_succeeded, sd_upload_failed, *args,
 						 **kwargs):
-		import threading
-		from octoprint import util as util
 
-		gcode = ""
-		file_size = 0
-		remote_name = ""
-
+		if not self._serial_obj:
+			return
 
 		def process_upload():
 			error = ""
@@ -178,26 +218,33 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.makeexclusive(False)
 			raise FlashForgeError(error, None)
 
-		if self._serial_obj:
-			existingSdFiles = map(lambda x: x[0], self._comm.getSdFiles())
-			remote_name = util.get_dos_filename(filename,
-								  existing_filenames=existingSdFiles,
-								  extension="gx",
-								  whitelisted_extensions=["gx"])
 
-			file = open(path, "r")
-			gcode = file.read()
-			file_size = len(gcode)
-			file.close()
+		import threading
+		from octoprint import util as util
 
-			self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
-			sd_upload_started(filename, remote_name)
+		gcode = ""
+		file_size = 0
+		remote_name = ""
 
-			thread = threading.Thread(target=process_upload, name="SD Uploader")
-			thread.daemon = True
-			thread.start()
+		existing_sd_files = map(lambda x: x[0], self._comm.getSdFiles())
+		remote_name = util.get_dos_filename(filename,
+							  existing_filenames=existing_sd_files,
+							  extension="gx",
+							  whitelisted_extensions=["gx"])
 
-			return remote_name
+		file = open(path, "r")
+		gcode = file.read()
+		file_size = len(gcode)
+		file.close()
+
+		self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
+		sd_upload_started(filename, remote_name)
+
+		thread = threading.Thread(target=process_upload, name="SD Uploader")
+		thread.daemon = True
+		thread.start()
+
+		return remote_name
 
 
 
@@ -215,6 +262,8 @@ def __plugin_load__():
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.transport.serial.factory": __plugin_implementation__.printer_factory,
 		"octoprint.filemanager.extension_tree": __plugin_implementation__.get_extension_tree,
+		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.rewrite_gcode,
+		"octoprint.comm.protocol.gcode.sent": __plugin_implementation__.sending_gcode,
 		"octoprint.printer.sdcardupload": __plugin_implementation__.upload_to_sd
 	}
 
