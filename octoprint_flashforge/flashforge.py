@@ -32,6 +32,8 @@ class FlashForge(object):
 		self.vendorid = 0x2b71		# FlashForge
 		self.deviceid = 0x0001		# Dreamer
 		# self.deviceid = 0x00ff	# PowerSpec Ultra
+		# self.vendorid = 0x2a89		#Dremel
+		# self.deviceid = 0x8889		#IdeaBuilder 3D20
 
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
