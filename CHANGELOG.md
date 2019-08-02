@@ -1,4 +1,4 @@
-#OctoPrint-FlashForge Changelog
+# OctoPrint-FlashForge Changelog
 
 ## 0.1.1 (2019-08-01)
 
