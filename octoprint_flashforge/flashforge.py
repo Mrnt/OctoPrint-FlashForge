@@ -1,5 +1,5 @@
 import usb1
-
+import threading
 
 try:
 	import queue
@@ -14,7 +14,6 @@ class FlashForgeError(Exception):
 		self.error = error
 
 
-
 class FlashForge(object):
 	ENDPOINT_CMD_IN = 0x81
 	ENDPOINT_CMD_OUT = 0x01
@@ -23,28 +22,25 @@ class FlashForge(object):
 	BUFFER_SIZE = 128
 
 
-	def __init__(self, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
+	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
 		import logging
-		self._logger = logging.getLogger("octoprint.plugins.octoprint_flashforge")
+		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("FlashForge.__init__()")
 
-		# USB ID's - device ID will need to be changed to match printer model
-		self.vendorid = 0x2b71		# FlashForge
-		self.deviceid = 0x0001		# Dreamer
-		# self.deviceid = 0x00ff	# PowerSpec Ultra
-		# self.vendorid = 0x2a89		#Dremel
-		# self.deviceid = 0x8889		#IdeaBuilder 3D20
-
+		self._plugin = plugin
+		self._comm = comm
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
 		self._incoming = queue.Queue()
+		self._readlock = threading.Lock()
+		self._writelock = threading.Lock()
 
 		self._context = usb1.USBContext()
-		self._handle = self._context.openByVendorIDAndProductID(self.vendorid, self.deviceid)
+		self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
 		if self._handle:
 			try:
 				self._handle.claimInterface(0)
-				# self.gcodecmd("M601 S0")
+				self._plugin.on_connect(self)
 			except usb1.USBError as usberror:
 				raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
 		else:
@@ -76,78 +72,126 @@ class FlashForge(object):
 
 
 	def write(self, data):
-		self._logger.debug("FlashForge.write() {0}".format(data))
+		self._logger.debug("FlashForge.write() called by thread {}".format(threading.currentThread().getName()))
 
-		# we don't support these commands
+		# save the length for return on success
 		data_len = len(data)
+		self._writelock.acquire()
 
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
-		if len(data) == 0 or data.find("M110") != -1:
-			# replace the default hello command with something recognized
-			data = "M601 S0"
-
-		# FlashForge uses "M107" to turn fan off not "M106 S0"
-		elif data.find("M106") != -1:
-			if "S0" in data:
-				data = "M107"
 
 		try:
-			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~{0}\r\n'.format(data).encode())
+			self._logger.debug("FlashForge.write() {0}".format(data))
+			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
+			self._writelock.release()
 			return data_len
 		except usb1.USBError as usberror:
-			raise FlashForgeError('USB Error', usberror)
+			self._writelock.release()
+			raise FlashForgeError('USB Error write()', usberror)
+
+
+	def writeraw(self, data):
+		self._logger.debug("FlashForge.writeraw() called by thread {}".format(threading.currentThread().getName()))
+
+		try:
+			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, data)
+			return len(data)
+		except usb1.USBError as usberror:
+			raise FlashForgeError('USB Error writeraw()', usberror)
 
 
 	def readline(self):
-		self._logger.debug("FlashForge.readline()")
+		"""
+		Supports serial factory - read response from the printer as a \r\n terminated line
+		Returns:
+			List of lines returned from the printer
+		"""
+		self._logger.debug("FlashForge.readline() called by thread {}".format(threading.currentThread().getName()))
+
+		self._readlock.acquire()
 
 		if not self._incoming.empty():
+			self._readlock.release()
 			return self._incoming.get_nowait()
 
-		try:
-			# read data from USB until ok signals end
-			data = ''
-			cmd_done = False
-			while not cmd_done:
-				newdata = self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, int(self._read_timeout * 1000.0)).decode()
-				if newdata.strip().endswith('ok'):
-					cmd_done = True
-				data = data + newdata
+		data = self.readraw()
 
-			# decode data
-			data = data.replace('\r', '')
-			self._logger.debug(data.replace('\n', '  '))
+		# decode data
+		if len(data):
 			datalines = data.splitlines()
 			for i, line in enumerate(datalines):
 				self._incoming.put(line)
 
-				if not line.find("CMD M20") == -1 and datalines[i+1] and datalines[i+1] == "ok":
+				if not line.find("CMD M20 ") == -1 and datalines[i+1] and datalines[i+1] == "ok":
 					# fetch SD card list does not get anything so fake out a result
 					self._incoming.put('Begin file list')
 					self._incoming.put('End file list')
+		else:
+			self._incoming.put(data)
 
-			return self._incoming.get_nowait()
+		self._readlock.release()
+		return self._incoming.get_nowait()
+
+
+	def readraw(self, timeout=-1):
+		"""
+		Read everything available from the from the printer
+		Returns:
+			String containing response from the printer
+		"""
+
+		data = ''
+		if timeout == -1:
+			timeout = int(self._read_timeout * 1000.0)
+		self._logger.debug("FlashForge.readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
+
+		try:
+			data = self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
+			# read data from USB until ok signals end or timeout
+			cmd_done = False
+			while not cmd_done:
+				newdata = self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
+				if newdata.strip().endswith('ok'):
+					cmd_done = True
+				data = data + newdata
 
 		except usb1.USBError as usberror:
 			if not usberror.value == -7: # LIBUSB_ERROR_TIMEOUT:
-				raise FlashForgeError('USB Error', usberror.value)
-		return ""
+				raise FlashForgeError('USB Error readraw()', usberror.value)
+
+		self._logger.debug("FlashForge.readraw() {}".format(data.replace('\r\n', '  ')))
+		return data
 
 
-	def gcodecmd(self, cmd):
-		self._logger.debug("FlashForge.gcodecmd() ~{0}".format(cmd).encode())
+	def sendcommand(self, cmd, timeout=-1, readresponse=True):
+		self._logger.debug("FlashForge.sendcommand() {}".format(cmd).encode())
 
-		self.write(cmd)
+		self.writeraw("~{}\r\n".format(cmd).encode())
+		if not readresponse:
+			return True, None
+
 		# read response
-		while True:
-			if self.readline() == "":
-				break
+		data = self.readraw(timeout)
+		if data.find("ok\r\n") != -1:
+			self._logger.debug("FlashForge.sendcommand() got an ok")
+			return True, data
+		return False, data
+
+
+	def makeexclusive(self, exclusive):
+		if exclusive:
+			self._readlock.acquire()
+			self._writelock.acquire()
+		else:
+			self._readlock.release()
+			self._writelock.release()
 
 
 	def close(self):
 		self._logger.debug("FlashForge.close()")
 		self._incoming = None
+		self._plugin.on_disconnect()
 		try:
 			self._handle.releaseInterface(0)
 		except usb1.USBError as usberror:

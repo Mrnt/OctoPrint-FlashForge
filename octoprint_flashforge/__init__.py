@@ -1,26 +1,33 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-### (Don't forget to remove me)
-# This is a basic skeleton for your plugin's __init__.py. You probably want to adjust the class name of your plugin
-# as well as the plugin mixins it's subclassing from. This is really just a basic skeleton to get you started,
-# defining your plugin as a template plugin, settings and asset plugin. Feel free to add or remove mixins
-# as necessary.
-#
-# Take a look at the documentation on what other plugin mixins are available.
-
+import usb1
 import octoprint.plugin
+from . import flashforge
+
 
 class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.AssetPlugin,
                        octoprint.plugin.TemplatePlugin):
 
 
+	VENDOR_IDS = {0x2b71: "FlashForge", 0x2a89: "Dremel"}
+	PRINTER_IDS = {
+		"Dremel": {0x8889: "Dremel IdeaBuilder"},
+		"FlashForge": {0x0001: "Dreamer", 0x0007: "Finder", 0x00ff: "PowerSpec Ultra"}}
+	FILE_PACKET_SIZE = 1024 * 4
+
+
 	def __init__(self):
 		import logging
-		self._logger = logging.getLogger("octoprint.plugins.octoprint_flashforge")
+		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
 		self._initialized = False
+		self._comm = None
+		self._serial_obj = None
+		self._currentFile = None
+		self._upload_percent = 0
+		self.device_id = 0
 
 
 	# internal initialize
@@ -74,9 +81,25 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		)
 
 
+	def detect_printer(self):
+		usbcontext = usb1.USBContext()
+		for device in usbcontext.getDeviceIterator(skip_on_error=True):
+			vendor_id = device.getVendorID()
+			if vendor_id in self.VENDOR_IDS:
+				vendor_name = self.VENDOR_IDS[vendor_id]
+				device_id = device.getProductID()
+				self._logger.debug("Found {} device ID {}".format(vendor_name, device_id))
+				if device_id in self.PRINTER_IDS[vendor_name]:
+					self._logger.debug("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
+					self.vendor_id = vendor_id
+					self.device_id = device_id
+					break
+		if self.device_id == 0:
+			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.", None)
+
+
 	# main serial connection hook
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
-		import logging
 
 		if not port == "AUTO":
 			return None
@@ -84,28 +107,139 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("printer_factory")
 		self._logger.debug("printer_factory port {}s".format(port))
 
-		from . import flashforge
-		serial_obj = flashforge.FlashForge(read_timeout=float(read_timeout))
+		self.detect_printer()
+
+		self._comm = comm
+		serial_obj = flashforge.FlashForge(self, comm, self.vendor_id, self.device_id, read_timeout=float(read_timeout))
 		return serial_obj
 
 
-	# stub for uploading files directly to SD card
+	def get_extension_tree(self, *args, **kwargs):
+		return dict(
+			machinecode=dict(
+				gx=["gx"]
+			)
+		)
+
+
+	def on_connect(self, serial_obj):
+		self._serial_obj = serial_obj
+
+
+	def on_disconnect(self):
+		self._serial_obj = None
+
+
+	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		self._logger.debug("rewrite_gcode(): {}".format(gcode))
+		if self._serial_obj and gcode:
+			# use M107 for fan off
+			if gcode == "M106":
+				if "S0" in cmd:
+					cmd = "M107"
+
+			# change the default hello
+			elif gcode == "M110":
+				cmd = "M601 S0"
+
+		return [cmd]
+
+
+	def sending_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		from octoprint.util import monotonic_time
+
+		if gcode:
+			if gcode == "M6" or gcode == "M7":
+				self._comm._heatupWaitStartTime = monotonic_time()
+				self._comm._long_running_command = True
+				self._comm._heating = True
+
+
+	# uploading files directly to internal SD card
 	def upload_to_sd(self, printer, filename, path, sd_upload_started, sd_upload_succeeded, sd_upload_failed, *args,
 						 **kwargs):
-		import threading
-		import time
 
-		remote_name = printer._get_free_remote_name(filename)
-		self._logger.info("Starting dummy SDCard upload from {} to {}".format(filename, remote_name))
+		if not self._serial_obj:
+			return
+
+		def process_upload():
+			error = ""
+
+			# rewrite:
+			self._upload_percent = 0
+			chunk_start_index = 0
+			counter = 0
+
+			self._serial_obj.makeexclusive(True)
+			error = "could not start tx"
+
+			# make sure heaters are off
+			self._serial_obj.sendcommand("M104 S0 T0")
+			self._serial_obj.sendcommand("M104 S0 T1")
+			self._serial_obj.sendcommand("M140 S0")
+
+			ok, answer = self._serial_obj.sendcommand("M28 {} 0:/user/{}".format(file_size, remote_name), 5000)
+			if not ok:
+				error = "file transfer not started {}".format(answer)
+			else:
+				self._logger.debug("M28 success")
+				error = ""
+
+				while chunk_start_index < file_size:
+					chunk_end_index = min(chunk_start_index + self.FILE_PACKET_SIZE, file_size)
+					chunk = gcode[chunk_start_index:chunk_end_index]
+					if not chunk:
+						error = "unexpected eof"
+						break
+					if self._serial_obj.writeraw(chunk):
+						counter += 1
+						if counter > 0:
+							counter = 0
+							upload_percent = 100.0 * chunk_end_index / file_size
+							self.upload_percent = int(upload_percent)
+							self._logger.debug("Sent: %.2f%% %d/%d" % (self.upload_percent, chunk_end_index, file_size))
+					else:
+						error = "File transfer interrupted"
+						break
+					chunk_start_index += self.FILE_PACKET_SIZE
+
+			if not error:
+				if self._serial_obj.sendcommand("M29", 10000)[0]:
+					self._serial_obj.sendcommand("~M23 0:/user/{}\r\n".format(remote_name), readresponse=False)
+					sd_upload_succeeded(filename, remote_name, 10)
+					self._serial_obj.makeexclusive(False)
+					return
+				else:
+					error = "File transfer incomplete"
+
+			self._logger.debug("Upload failed: {}".format(error))
+			sd_upload_failed(filename, remote_name, 10)
+			self._serial_obj.makeexclusive(False)
+			raise flashforge.FlashForgeError(error, None)
+
+
+		import threading
+		from octoprint import util as util
+
+		gcode = ""
+		file_size = 0
+		remote_name = ""
+
+		existing_sd_files = map(lambda x: x[0], self._comm.getSdFiles())
+		remote_name = util.get_dos_filename(filename,
+							  existing_filenames=existing_sd_files,
+							  extension="gx",
+							  whitelisted_extensions=["gx"])
+
+		file = open(path, "r")
+		gcode = file.read()
+		file_size = len(gcode)
+		file.close()
+
+		self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
 		sd_upload_started(filename, remote_name)
 
-		def process():
-			self._logger.info("Sleeping 10s...")
-			time.sleep(10)
-			self._logger.info("And done!")
-			sd_upload_succeeded(filename, remote_name, 10)
-
-		thread = threading.Thread(target=process)
+		thread = threading.Thread(target=process_upload, name="SD Uploader")
 		thread.daemon = True
 		thread.start()
 
@@ -126,6 +260,9 @@ def __plugin_load__():
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.transport.serial.factory": __plugin_implementation__.printer_factory,
+		"octoprint.filemanager.extension_tree": __plugin_implementation__.get_extension_tree,
+		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.rewrite_gcode,
+		"octoprint.comm.protocol.gcode.sent": __plugin_implementation__.sending_gcode,
 		"octoprint.printer.sdcardupload": __plugin_implementation__.upload_to_sd
 	}
 
