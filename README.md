@@ -4,6 +4,18 @@ Support communication with closed source FlashForge printers such as Finder, Dre
 
 Based on work by [Noneus](https://github.com/Noneus)
 
+## Current Capabilities
+
+- Automatically detect and connect to Dremel IdeaBuilder, FlashForge Finder, FlashForge Dreamer, PowerSpec Ultra
+- Use Octoprint Control UI to: 
+    - Set and monitor printer temperature
+    - Move extruder, bed
+    - Turn fans on and off
+    - Extrude, retract
+- Upload a FlashPrint prepared .gx file using the "Upload to SD" button which will immediately start a print (like FlashPrint) - __NB: cannot pause or cancel at this time__ 
+ 
+ 
+
 ## Setup
 
 Install via the bundled [Plugin Manager](https://github.com/foosel/OctoPrint/wiki/Plugin:-Plugin-Manager)
