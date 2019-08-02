@@ -1,6 +1,6 @@
 # OctoPrint-FlashForge
 
-Support communication with closed source FlashForge printers such as Finder, Dreamer and rebranded printers such as the PowerSpec Ultra, Dremel Idea Builder.
+Add support to the [Octoprint](https://octoprint.org) 3D printer web interface for communication with closed source FlashForge printers such as Finder, Dreamer and rebranded printers such as the PowerSpec Ultra, Dremel Idea Builder.
 
 Based on work by [Noneus](https://github.com/Noneus)
 
