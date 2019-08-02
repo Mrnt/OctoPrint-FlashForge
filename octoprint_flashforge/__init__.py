@@ -131,6 +131,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		self._logger.debug("rewrite_gcode(): {}".format(gcode))
 		if self._serial_obj and gcode:
 			# use M107 for fan off
 			if gcode == "M106":
@@ -141,7 +142,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M110":
 				cmd = "M601 S0"
 
-		return cmd
+		return [cmd]
 
 
 	def sending_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
@@ -204,17 +205,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			if not error:
 				if self._serial_obj.sendcommand("M29", 10000)[0]:
-					ok, answer = self._serial_obj.sendcommand("M23 0:/user/{}".format(remote_name))
-					if "File selected" in answer:
-						self._logger.debug("And done!")
-
-						sd_upload_succeeded(filename, remote_name, 10)
-						self._serial_obj.makeexclusive(False)
-						return
-					elif "Disk read error" in answer:
-						error = "Disk read error"
-					else:
-						error = "Printer did respond to file print M23 {}".format(answer)
+					self._serial_obj.sendcommand("~M23 0:/user/{}\r\n".format(remote_name), readresponse=False)
+					sd_upload_succeeded(filename, remote_name, 10)
+					self._serial_obj.makeexclusive(False)
+					return
 				else:
 					error = "File transfer incomplete"
 

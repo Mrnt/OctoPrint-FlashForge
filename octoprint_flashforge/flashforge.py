@@ -164,10 +164,12 @@ class FlashForge(object):
 		return data
 
 
-	def sendcommand(self, cmd, timeout=-1):
+	def sendcommand(self, cmd, timeout=-1, readresponse=True):
 		self._logger.debug("FlashForge.sendcommand() {}".format(cmd).encode())
 
 		self.writeraw("~{}\r\n".format(cmd).encode())
+		if not readresponse:
+			return True, None
 
 		# read response
 		data = self.readraw(timeout)
