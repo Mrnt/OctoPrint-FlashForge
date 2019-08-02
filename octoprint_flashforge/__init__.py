@@ -11,8 +11,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.TemplatePlugin):
 
 
-	FLASHFORGE_ID = 0x2b71 #FlashForge USB vendor ID
-	PRINTER_IDS = {123:"Finder", 0x0001:"Dreamer", 0x00ff:"PowerSpec Ultra"}
+	VENDOR_IDS = {0x2b71: "FlashForge", 0x2a89: "Dremel"}
+	PRINTER_IDS = {
+		"Dremel": {0x8889: "Dremel IdeaBuilder"},
+		"FlashForge": {0x0001: "Dreamer", 0x0007: "Finder", 0x00ff: "PowerSpec Ultra"}}
 	FILE_PACKET_SIZE = 1024 * 4
 
 
@@ -82,15 +84,18 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def detect_printer(self):
 		usbcontext = usb1.USBContext()
 		for device in usbcontext.getDeviceIterator(skip_on_error=True):
-			if device.getVendorID() == self.FLASHFORGE_ID:
+			vendor_id = device.getVendorID()
+			if vendor_id in self.VENDOR_IDS:
+				vendor_name = self.VENDOR_IDS[vendor_id]
 				device_id = device.getProductID()
-				self._logger.debug("Found device ID {}".format(device_id))
-				if device_id in self.PRINTER_IDS:
-					self._logger.debug("Found a {}".format(self.PRINTER_IDS[device_id]))
+				self._logger.debug("Found {} device ID {}".format(vendor_name, device_id))
+				if device_id in self.PRINTER_IDS[vendor_name]:
+					self._logger.debug("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
+					self.vendor_id = vendor_id
 					self.device_id = device_id
 					break
 		if self.device_id == 0:
-			raise FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.", None)
+			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.", None)
 
 
 	# main serial connection hook
@@ -105,7 +110,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self.detect_printer()
 
 		self._comm = comm
-		serial_obj = flashforge.FlashForge(self, comm, self.FLASHFORGE_ID, self.device_id, read_timeout=float(read_timeout))
+		serial_obj = flashforge.FlashForge(self, comm, self.vendor_id, self.device_id, read_timeout=float(read_timeout))
 		return serial_obj
 
 
@@ -216,7 +221,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.debug("Upload failed: {}".format(error))
 			sd_upload_failed(filename, remote_name, 10)
 			self._serial_obj.makeexclusive(False)
-			raise FlashForgeError(error, None)
+			raise flashforge.FlashForgeError(error, None)
 
 
 		import threading
