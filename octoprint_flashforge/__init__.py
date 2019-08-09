@@ -14,7 +14,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	VENDOR_IDS = {0x2b71: "FlashForge", 0x2a89: "Dremel"}
 	PRINTER_IDS = {
 		"Dremel": {0x8889: "Dremel IdeaBuilder"},
-		"FlashForge": {0x0001: "Dreamer", 0x0007: "Finder", 0x00ff: "PowerSpec Ultra"}}
+		"FlashForge": {0x0001: "Dreamer", 0x0002: "Finder (v1)", 0x0007: "Finder (v2)", 0x00ff: "PowerSpec Ultra"}}
 	FILE_PACKET_SIZE = 1024 * 4
 
 
@@ -123,26 +123,69 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 
 	def on_connect(self, serial_obj):
+		self._logger.debug("on_connect()")
 		self._serial_obj = serial_obj
 
 
 	def on_disconnect(self):
+		self._logger.debug("on_disconnect()")
 		self._serial_obj = None
 
 
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
-		self._logger.debug("rewrite_gcode(): {}".format(gcode))
+		self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
 		if self._serial_obj and gcode:
-			# use M107 for fan off
-			if gcode == "M106":
+
+			# M20 list SD card, M21 init SD card - do not do if we are busy
+			if (gcode == "M20" or gcode == "M21") and not self._serial_obj.is_ready():
+				cmd = [None]
+
+			# M25 = pause
+			elif gcode == "M25":
+				# pause during cancel causes issues
+				if comm_instance.isCancelling():
+					cmd = [None]
+
+			# M26 in Marlin = set SD card position : Flashforge = cancel
+			elif gcode == "M26":
+				# M26 S0 generated during cancel - use it to send cancel
+				if cmd == "M26 S0" and comm_instance.isCancelling():
+					cmd = "M26"
+				else:
+					cmd = [None]
+
+			# M84 in Marlin = disable steppers : Flashforge = undefined?
+			elif gcode == "M84":
+				cmd = ["M18"]
+
+			# also get printer status when getting temp status
+			elif gcode == "M105":
+				cmd = [("M119", "status_polling"),(cmd, cmd_type)]
+
+			# M106 S0 in Marlin = fan off : Flashforge uses M107 for fan off
+			elif gcode == "M106":
 				if "S0" in cmd:
-					cmd = "M107"
+					cmd = ["M107"]
+
+			# M108 in Marlin = stop loop & continue : Flashforge=change toolhead
+			elif gcode == "M108":
+				cmd = [None]
 
 			# change the default hello
 			elif gcode == "M110":
-				cmd = "M601 S0"
+				#cmd = ["M601 S0", "M650", "M115", "M114"]
+				cmd = ["M601 S0"]
 
-		return [cmd]
+			# also get printer status when connecting
+			elif gcode == "M115":
+				cmd = [("M119", "status_polling"), ("M27", "sd_status_polling"), (cmd, cmd_type)]
+
+			# M400 in Marlin=wait for moves to finish : Flashforge=? - send something inert so on_M400_sent is triggered
+			elif gcode == "M400":
+				#cmd = [None]
+				cmd = "M27"
+
+		return cmd
 
 
 	def sending_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
@@ -205,9 +248,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			if not error:
 				if self._serial_obj.sendcommand("M29", 10000)[0]:
-					self._serial_obj.sendcommand("~M23 0:/user/{}\r\n".format(remote_name), readresponse=False)
 					sd_upload_succeeded(filename, remote_name, 10)
 					self._serial_obj.makeexclusive(False)
+					self._comm.selectFile("0:/user/{}\r\n".format(remote_name), True)
+					self._comm.startPrint()
 					return
 				else:
 					error = "File transfer incomplete"
