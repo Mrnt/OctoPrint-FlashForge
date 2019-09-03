@@ -10,7 +10,7 @@ except ImportError:
 
 class FlashForgeError(Exception):
 	def __init__(self, message, error=0):
-		super(FlashForgeError, self).__init__("{0} ({1})".format(message, error))
+		super(FlashForgeError, self).__init__(("{} ({})" if error else "{}").format(message, error))
 		self.error = error
 
 
