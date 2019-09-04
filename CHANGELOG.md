@@ -1,5 +1,11 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.2 (2019-09-03)
+
+* Detect two versions of FlashForge Finder
+* Pausing/Cancelling the print triggered by "Upload to SD Card" should now work
+* __NB: Printing still only supported via "Upload to SD Card" button!__
+
 ## 0.1.1 (2019-08-01)
 
 * Automatically detect printer (no hardcoding of USB ID's)
