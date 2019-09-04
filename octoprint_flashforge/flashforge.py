@@ -10,7 +10,7 @@ except ImportError:
 
 class FlashForgeError(Exception):
 	def __init__(self, message, error=0):
-		super(FlashForgeError, self).__init__("{0} ({1})".format(message, error))
+		super(FlashForgeError, self).__init__(("{} ({})" if error else "{}").format(message, error))
 		self.error = error
 
 
@@ -20,6 +20,15 @@ class FlashForge(object):
 	ENDPOINT_DATA_IN = 0x83
 	ENDPOINT_DATA_OUT = 0x03
 	BUFFER_SIZE = 128
+
+	STATE_UNKNOWN = 0
+	STATE_READY = 1
+	STATE_BUILDING = 2
+	STATE_PAUSED = 3
+	STATE_HOMING = 4
+	STATE_BUSY = 5
+
+	PRINTING_STATES = (STATE_BUILDING, STATE_HOMING)
 
 
 	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
@@ -34,6 +43,7 @@ class FlashForge(object):
 		self._incoming = queue.Queue()
 		self._readlock = threading.Lock()
 		self._writelock = threading.Lock()
+		self._printerstate = self.STATE_UNKNOWN
 
 		self._context = usb1.USBContext()
 		self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
@@ -63,6 +73,14 @@ class FlashForge(object):
 	@property
 	def write_timeout(self):
 		return self._write_timeout
+
+
+	def is_ready(self):
+		return self._printerstate == self.STATE_READY
+
+
+	def is_printing(self):
+		return self._printerstate in self.PRINTING_STATES
 
 
 	@write_timeout.setter
@@ -117,16 +135,34 @@ class FlashForge(object):
 
 		data = self.readraw()
 
-		# decode data
+		# translate returned data into something Octoprint understands
 		if len(data):
+			if 'CMD M119 ' in data:
+				if 'MachineStatus: READY' in data:
+					self._printerstate = self.STATE_READY
+				elif 'MachineStatus: BUILDING_FROM_SD' in data:
+					if 'MoveMode: PAUSED' in data:
+						self._printerstate = self.STATE_PAUSED
+					else:
+						self._printerstate = self.STATE_BUILDING
+				else:
+					self._printerstate = self.STATE_BUSY
+
+			elif data.find("CMD M27 ") != -1 and not self._printerstate in self.PRINTING_STATES:
+				# after print is cancelled M27 always looks like its printing from sd card
+				data = "CMD M27 Received.\r\nok"
+
+			# turn data into list of lines
 			datalines = data.splitlines()
 			for i, line in enumerate(datalines):
 				self._incoming.put(line)
 
-				if not line.find("CMD M20 ") == -1 and datalines[i+1] and datalines[i+1] == "ok":
+				# if M20 (list SD card files) does not return anything, make it look like an empty file list
+				if 'CMD M20 ' in line and datalines[i+1] and datalines[i+1] == "ok":
 					# fetch SD card list does not get anything so fake out a result
 					self._incoming.put('Begin file list')
 					self._incoming.put('End file list')
+
 		else:
 			self._incoming.put(data)
 
@@ -173,7 +209,7 @@ class FlashForge(object):
 
 		# read response
 		data = self.readraw(timeout)
-		if data.find("ok\r\n") != -1:
+		if "ok\r\n" in data:
 			self._logger.debug("FlashForge.sendcommand() got an ok")
 			return True, data
 		return False, data
