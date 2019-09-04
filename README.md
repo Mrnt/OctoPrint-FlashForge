@@ -40,6 +40,19 @@ Change "Send a checksum with the command" to "Never"
 Under OctoPrint > Settings > Printer Profiles:
 Edit the default printer profile or create a new to reflect the number of extruders, build volume, etc.
 
+Under OctoPrint > Settings > Plugin Manager:
+Verify that the FlashForge plugin is enabled
+
 ### Connection
 
 Under the main interface select "Auto" for "Serial Port".
+
+## Troubleshooting
+
+Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be restarted.
+
+If it fails to detect or connect to the printer check the Terminal tab in Octoprint for errors.
+
+Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set octoprint.plugins.flashforge to "DEBUG" and then click "Save")
+
+After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log)
