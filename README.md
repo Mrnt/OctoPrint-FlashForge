@@ -35,6 +35,7 @@ Change all settings under "Query Intervals" to 1s.
 
 Under OctoPrint > Settings > Serial Connection > Firmware & Protocol:
 Disable "Enable automatic firmware detection"
+Enable "Always assume SD card is present"
 Change "Send a checksum with the command" to "Never"
 
 Under OctoPrint > Settings > Printer Profiles:
@@ -52,7 +53,7 @@ Under the main interface select "Auto" for "Serial Port".
 Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be restarted. 
 If plugin does not appear in Plugin Manager list `libusb1` may need to be installed manually - current version of plugin should do this automatically.
 
-If the plugin fails to detect or connect to the printer check the Terminal tab in Octoprint for errors.
+If the plugin fails to detect or connect to the printer check the Terminal tab in Octoprint for errors and verify that you set up the Serial Connection settings as described in the Configuration section above.
 
 If you are on OctoPi/Linux and see a USB permissions error then you will need to add a udev rule to allow access to the printer - see error message in the Terminal tab of Octoprint for instructions.
 
