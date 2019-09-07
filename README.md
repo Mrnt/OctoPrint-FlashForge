@@ -49,10 +49,17 @@ Under the main interface select "Auto" for "Serial Port".
 
 ## Troubleshooting
 
-Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be restarted.
+Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be restarted. 
+If plugin does not appear in Plugin Manager list `libusb1` may need to be installed manually - current version of plugin should do this automatically.
 
-If it fails to detect or connect to the printer check the Terminal tab in Octoprint for errors.
+If the plugin fails to detect or connect to the printer check the Terminal tab in Octoprint for errors.
 
-Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set octoprint.plugins.flashforge to "DEBUG" and then click "Save")
+If you are on OctoPi/Linux and see a USB permissions error then you will need to add a udev rule to allow access to the printer - see error message in the Terminal tab of Octoprint for instructions.
 
-After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log)
+Verify that the Serial Connection settings are set correctly, in particular the "Send a checksum with the command" setting.
+
+Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set octoprint.plugins.flashforge to "DEBUG" and then click "Save") to help troubleshoot connection issues.
+
+After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log) for clues.
+
+

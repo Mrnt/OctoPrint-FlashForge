@@ -86,7 +86,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		for device in usbcontext.getDeviceIterator(skip_on_error=True):
 			vendor_id = device.getVendorID()
 			device_id = device.getProductID()
-			self._logger.debug("Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device.getProduct(), vendor_id, device_id))
+			try:
+				device_name = device.getProduct()
+			except:
+				device_name = 'unknown'
+			self._logger.debug("Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id, device_id))
 			if vendor_id in self.VENDOR_IDS:
 				vendor_name = self.VENDOR_IDS[vendor_id]
 				if device_id in self.PRINTER_IDS[vendor_name]:
@@ -95,7 +99,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					self.device_id = device_id
 					break
 				else:
-					raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device.getProduct(), device_id), None)
+					raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id), None)
 
 		if self.device_id == 0:
 			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.", None)

@@ -46,16 +46,25 @@ class FlashForge(object):
 		self._printerstate = self.STATE_UNKNOWN
 
 		self._context = usb1.USBContext()
-		self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
-		if self._handle:
-			try:
-				self._handle.claimInterface(0)
-				self._plugin.on_connect(self)
-			except usb1.USBError as usberror:
+		try:
+			self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
+		except usb1.USBError as usberror:
+			if usberror.value == -3:
+				raise FlashForgeError("Unable to connect to FlashForge printer - permission error.\r\n\r\n"
+									  "On OctoPi/Linux add the following line to\r\n /etc/udev/rules.d/99-octoprint.rules:\r\n\r\n"
+									  "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{:04x}\", MODE=\"0666\"\r\n\r\nThen reboot your system for the rule to take effect.\r\n\r\n".format(vendor_id))
+			else:
 				raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
 		else:
-			self._logger.debug("No FlashForge printer found")
-			raise FlashForgeError('No FlashForge Printer found')
+			if self._handle:
+				try:
+					self._handle.claimInterface(0)
+					self._plugin.on_connect(self)
+				except usb1.USBError as usberror:
+					raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
+			else:
+				self._logger.debug("No FlashForge printer found")
+				raise FlashForgeError('No FlashForge Printer found')
 
 
 	@property
