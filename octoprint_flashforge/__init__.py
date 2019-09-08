@@ -20,6 +20,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	def __init__(self):
 		import logging
+		import octoprint.settings
+
+		# set FlashForge friendly default settings
+		#octoprint.settings.default_settings['serial']['waitForStartOnConnect'] = False
+		#octoprint.settings.default_settings['serial']['firmwareDetection'] = False
+		octoprint.settings.default_settings['serial']['neverSendChecksum'] = True
+		octoprint.settings.default_settings['serial']['sdAlwaysAvailable'] = True
+		octoprint.settings.default_settings['serial']['timeout']['temperature'] = 2
+
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
 		self._initialized = False

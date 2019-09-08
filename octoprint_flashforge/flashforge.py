@@ -192,14 +192,10 @@ class FlashForge(object):
 		self._logger.debug("FlashForge.readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
 
 		try:
-			data = self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
+			data = ''
 			# read data from USB until ok signals end or timeout
-			cmd_done = False
-			while not cmd_done:
-				newdata = self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
-				if newdata.strip().endswith('ok'):
-					cmd_done = True
-				data = data + newdata
+			while not data.strip().endswith('ok'):
+				data += self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
 
 		except usb1.USBError as usberror:
 			if not usberror.value == -7: # LIBUSB_ERROR_TIMEOUT:
