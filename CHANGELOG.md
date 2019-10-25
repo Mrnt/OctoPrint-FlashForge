@@ -1,5 +1,13 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.5 (2019-10-10)
+* Support FlashForge Inventor
+
+## 0.1.4 (2019-09-08)
+* Updates to README
+* Set default values for settings we care about
+* Fix bug causing timeout when reading from USB port
+
 ## 0.1.3 (2019-09-03)
 
 * Support for OctoPi/Linux (where USB access requires OS permission)
