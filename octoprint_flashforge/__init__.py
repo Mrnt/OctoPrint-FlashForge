@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import usb1
+import re
 import octoprint.plugin
 from . import flashforge
 
@@ -151,6 +152,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
 		if self._serial_obj:
 
+			if not re.match(r'^[MG]\d+', cmd):
+				# most likely part of the header in a .gx FlashPrint file
+				self._logger.debug("rewrite_gcode(): unrecognized command")
+				return "M119"
+
 			self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
 
 			# M20 list SD card, M21 init SD card - do not do if we are busy
@@ -184,7 +190,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				cmd = ["M18"]
 
 			# also get printer status when getting temp status
-			elif gcode == "M105":
+			elif gcode == "M105" or gcode == "G1":
 				cmd = [("M119", "status_polling"),(cmd, cmd_type)]
 
 			# M106 S0 in Marlin = fan off : Flashforge uses M107 for fan off
@@ -193,7 +199,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					cmd = ["M107"]
 
 			# M108 in Marlin = stop loop & continue : Flashforge=change toolhead, no equivalent?
-			elif gcode == "M108":
+			elif cmd == "M108":
 				cmd = []
 
 			# M109 in Marlin = wait for extruder temp : M6 in Flashforge
@@ -215,6 +221,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# M400 in Marlin=wait for moves to finish : Flashforge=? - send something inert so on_M400_sent is triggered
 			elif gcode == "M400":
 				cmd = "M27"
+
+			elif re.match(r'^G\d+', cmd):
+				while not self._serial_obj.is_ready():
+					self._logger.debug("rewrite_gcode(): waiting for ready")
+					time.sleep(0.5)
+				cmd = [("M119", "status_polling"), (cmd, cmd_type)]
+
+			if cmd == []:
+				self._logger.debug("rewrite_gcode(): dropping command")
 
 		return cmd
 

@@ -1,5 +1,7 @@
 import usb1
 import threading
+import re
+import time
 
 try:
 	import queue
@@ -85,10 +87,12 @@ class FlashForge(object):
 
 
 	def is_ready(self):
+		self._logger.debug("is_ready()")
 		return self._printerstate == self.STATE_READY
 
 
 	def is_printing(self):
+		self._logger.debug("is_printing()")
 		return self._printerstate in self.PRINTING_STATES
 
 
@@ -105,12 +109,25 @@ class FlashForge(object):
 		data_len = len(data)
 		self._writelock.acquire()
 
+		if re.match(r'^G\d+', data):
+			while not self.is_ready():
+				try:
+					self._logger.debug("FlashForge.write() wait for ready")
+					# success, result = self.sendcommand('~M119\r\n')
+					self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~M119\r\n', int(self._write_timeout * 1000.0))
+					time.sleep(0.5)
+				except usb1.USBError as usberror:
+					self._writelock.release()
+					raise FlashForgeError('USB Error write()', usberror)
+
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
 
 		try:
 			self._logger.debug("FlashForge.write() {0}".format(data))
 			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
+			# if re.match(r'^(M6|M7|G28)', data):
+			#	self._printerstate = self.STATE_UNKNOWN
 			self._writelock.release()
 			return data_len
 		except usb1.USBError as usberror:
@@ -143,11 +160,13 @@ class FlashForge(object):
 			return self._incoming.get_nowait()
 
 		data = self.readraw()
+		if not data.strip().endswith('ok') and len(data):
+			data += self.readraw()
 
 		# translate returned data into something Octoprint understands
 		if len(data):
 			if 'CMD M119 ' in data:
-				if 'MachineStatus: READY' in data:
+				if 'MachineStatus: READY' in data and 'MoveMode: READY' in data:
 					self._printerstate = self.STATE_READY
 				elif 'MachineStatus: BUILDING_FROM_SD' in data:
 					if 'MoveMode: PAUSED' in data:
@@ -192,7 +211,6 @@ class FlashForge(object):
 		self._logger.debug("FlashForge.readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
 
 		try:
-			data = ''
 			# read data from USB until ok signals end or timeout
 			while not data.strip().endswith('ok'):
 				data += self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
@@ -200,6 +218,8 @@ class FlashForge(object):
 		except usb1.USBError as usberror:
 			if not usberror.value == -7: # LIBUSB_ERROR_TIMEOUT:
 				raise FlashForgeError('USB Error readraw()', usberror.value)
+			else:
+				self._logger.debug("FlashForge.readraw() timeout")
 
 		self._logger.debug("FlashForge.readraw() {}".format(data.replace('\r\n', '  ')))
 		return data
