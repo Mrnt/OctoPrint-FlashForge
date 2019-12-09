@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.6 (2019-12-9)
+* Support FlashForge VID 0x0315 (Thanks @twistedcustomdevel)
+
 ## 0.1.5 (2019-10-10)
 * Support FlashForge Inventor
 
