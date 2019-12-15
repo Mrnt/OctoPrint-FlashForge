@@ -11,8 +11,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.TemplatePlugin):
 
 
-	VENDOR_IDS = {0x0315: "FlashForge", 0x2b71: "FlashForge", 0x2a89: "Dremel"}
+	VENDOR_IDS = {0x0315: "PowerSpec", 0x2a89: "Dremel", 0x2b71: "FlashForge"}
 	PRINTER_IDS = {
+		"PowerSpec": {0x0001: "Ultra 3DPrinter"},
 		"Dremel": {0x8889: "Dremel IdeaBuilder"},
 		"FlashForge": {0x0001: "Dreamer", 0X000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2", 0x00ff: "PowerSpec Ultra"}}
 	FILE_PACKET_SIZE = 1024 * 4
