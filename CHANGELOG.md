@@ -1,6 +1,7 @@
 # OctoPrint-FlashForge Changelog
 
 ## 0.1.7 (2019-12-9)
+* Added support for Dreamer NX (Thanks @mrspartak)
 * Support VID 0x0315 as PowerSpec (Thanks @twistedcustomdevel)
 
 ## 0.1.6 (2019-12-9)
