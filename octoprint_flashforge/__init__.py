@@ -15,8 +15,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	PRINTER_IDS = {
 		"PowerSpec": {0x0001: "Ultra 3DPrinter"},
 		"Dremel": {0x8889: "Dremel IdeaBuilder"},
-		"FlashForge": {0x0001: "Dreamer", 0X000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2", 0x00ff: "PowerSpec Ultra"}}
-	FILE_PACKET_SIZE = 1024 * 4
+		"FlashForge": {0x0001: "Dreamer", 0x000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2", 0x00ff: "PowerSpec Ultra"}}
+	FILE_PACKET_SIZE = 512
 
 
 	def __init__(self):
@@ -32,7 +32,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
-		self._initialized = False
 		self._comm = None
 		self._serial_obj = None
 		self._currentFile = None
@@ -40,24 +39,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self.device_id = 0
 
 
-	# internal initialize
-	def _initialize(self):
-		self._logger.debug("_initialize")
-		if self._initialized:
-			return
-		self._initialized = True
-
-
 	# StartupPlugin
 	def on_after_startup(self, *args, **kwargs):
 		self._logger.debug("on_after_startup")
-		self._initialize()
 
 
 	##~~ SettingsPlugin mixin
 	def get_settings_defaults(self):
+		# put your plugin's default settings here
 		return dict(
-			# put your plugin's default settings here
 		)
 
 
@@ -91,31 +81,32 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		)
 
 
+	# Look for a supported printer
 	def detect_printer(self):
-		usbcontext = usb1.USBContext()
-		for device in usbcontext.getDeviceIterator(skip_on_error=True):
-			vendor_id = device.getVendorID()
-			device_id = device.getProductID()
-			try:
-				device_name = device.getProduct()
-			except:
-				device_name = 'unknown'
-			self._logger.debug("Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id, device_id))
-			if vendor_id in self.VENDOR_IDS:
-				vendor_name = self.VENDOR_IDS[vendor_id]
-				if device_id in self.PRINTER_IDS[vendor_name]:
-					self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
-					self.vendor_id = vendor_id
-					self.device_id = device_id
-					break
-				else:
-					raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id), None)
+		with usb1.USBContext() as usbcontext:
+			for device in usbcontext.getDeviceIterator(skip_on_error=True):
+				vendor_id = device.getVendorID()
+				device_id = device.getProductID()
+				try:
+					device_name = device.getProduct()
+				except:
+					device_name = 'unknown'
+				self._logger.debug("Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id, device_id))
+				if vendor_id in self.VENDOR_IDS:
+					vendor_name = self.VENDOR_IDS[vendor_id]
+					if device_id in self.PRINTER_IDS[vendor_name]:
+						self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
+						self.vendor_id = vendor_id
+						self.device_id = device_id
+						break
+					else:
+						raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id))
 
 		if self.device_id == 0:
-			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.", None)
+			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
 
 
-	# main serial connection hook
+	# Main serial connection hook - create our printer connection
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
 
 		if not port == "AUTO":
@@ -131,6 +122,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		return serial_obj
 
 
+	# Supported file extensions for SD upload
 	def get_extension_tree(self, *args, **kwargs):
 		return dict(
 			machinecode=dict(
@@ -149,6 +141,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 
 
+	# Called when gcode commands are being placed in the queue by OctoPrint:
+	# Mostly important for control panel or translating and printing non FlashPrint file directly from OctoPrint
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
 		if self._serial_obj:
 
@@ -168,8 +162,14 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M26":
 				# M26 S0 generated during cancel - use it to send cancel
 				if cmd == "M26 S0" and comm_instance.isCancelling():
-					cmd = "M26"
+					cmd = [("M26", cmd_type), ("M119", "status_polling")]
 				else:
+					cmd = []
+
+			# M27 get SD card state
+			elif gcode == "M27":
+				if comm_instance.isCancelling():
+					# FF keeps showing SD card progress while cancelling, confusing OctoPrint
 					cmd = []
 
 			# M82 in Marlin = extruder abs positioning : Flashforge = undefined?
@@ -186,7 +186,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			# also get printer status when getting temp status
 			elif gcode == "M105":
-				cmd = [("M119", "status_polling"),(cmd, cmd_type)]
+				cmd = [("M119", "status_polling"), (cmd, cmd_type)]
 
 			# M106 S0 in Marlin = fan off : Flashforge uses M107 for fan off
 			elif gcode == "M106":
@@ -220,17 +220,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		return cmd
 
 
-	def sending_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
-		from octoprint.util import monotonic_time
-
-		if gcode:
-			if gcode == "M6" or gcode == "M7":
-				self._comm._heatupWaitStartTime = monotonic_time()
-				self._comm._long_running_command = True
-				self._comm._heating = True
-
-
-	# uploading files directly to internal SD card
+	# Uploading files directly to internal SD card
 	def upload_to_sd(self, printer, filename, path, sd_upload_started, sd_upload_succeeded, sd_upload_failed, *args,
 						 **kwargs):
 
@@ -243,55 +233,63 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# rewrite:
 			self._upload_percent = 0
 			chunk_start_index = 0
-			counter = 0
 
 			self._serial_obj.makeexclusive(True)
 			error = "could not start tx"
 
 			# make sure heaters are off
-			self._serial_obj.sendcommand("M104 S0 T0")
-			self._serial_obj.sendcommand("M104 S0 T1")
-			self._serial_obj.sendcommand("M140 S0")
+			#self._serial_obj.sendcommand("M104 S0 T0")
+			#self._serial_obj.sendcommand("M104 S0 T1")
+			#self._serial_obj.sendcommand("M140 S0")
 
 			ok, answer = self._serial_obj.sendcommand("M28 {} 0:/user/{}".format(file_size, remote_name), 5000)
 			if not ok:
 				error = "file transfer not started {}".format(answer)
 			else:
-				self._logger.debug("M28 success")
+				self._logger.debug("M28 file tx started")
 				error = ""
 
+			try:
 				while chunk_start_index < file_size:
 					chunk_end_index = min(chunk_start_index + self.FILE_PACKET_SIZE, file_size)
 					chunk = gcode[chunk_start_index:chunk_end_index]
 					if not chunk:
 						error = "unexpected eof"
 						break
+
 					if self._serial_obj.writeraw(chunk):
-						counter += 1
-						if counter > 0:
-							counter = 0
-							upload_percent = 100.0 * chunk_end_index / file_size
-							self.upload_percent = int(upload_percent)
-							self._logger.debug("Sent: %.2f%% %d/%d" % (self.upload_percent, chunk_end_index, file_size))
+						upload_percent = 100.0 * chunk_end_index / file_size
+						self.upload_percent = int(upload_percent)
+						self._logger.debug("Sent: %.2f%% %d/%d" % (self.upload_percent, chunk_end_index, file_size))
 					else:
 						error = "File transfer interrupted"
 						break
+
 					chunk_start_index += self.FILE_PACKET_SIZE
 
-			if not error:
-				if self._serial_obj.sendcommand("M29", 10000)[0]:
-					sd_upload_succeeded(filename, remote_name, 10)
-					self._serial_obj.makeexclusive(False)
-					# NB M23 select will also trigger a print on Flashforge
-					self._comm.selectFile("0:/user/{}\r\n".format(remote_name), True)
-					return
-				else:
-					error = "File transfer incomplete"
+				if not error:
+					result, response = self._serial_obj.sendcommand("M29", 10000)
+					if result and "CMD M28" in response:
+						response = self._serial_obj.readraw(1000)
+					if result and "failed" not in response:
+						sd_upload_succeeded(filename, remote_name, 10)
+					else:
+						error = "File transfer incomplete"
 
-			self._logger.debug("Upload failed: {}".format(error))
-			sd_upload_failed(filename, remote_name, 10)
+			except flashforge.FlashForgeError as error:
+				error = "File transfer incomplete"
+				pass
+
+			if error:
+				self._logger.debug("Upload failed: {}".format(error))
+				sd_upload_failed(filename, remote_name, 10)
+				self._serial_obj.makeexclusive(False)
+				raise flashforge.FlashForgeError(error)
+
 			self._serial_obj.makeexclusive(False)
-			raise flashforge.FlashForgeError(error, None)
+			# NB M23 select will also trigger a print on Flashforge
+			self._comm.selectFile("0:/user/{}\r\n".format(remote_name), True)
+			# TODO: need to set the correct file size for the progress indicator
 
 
 		import threading
@@ -338,7 +336,6 @@ def __plugin_load__():
 		"octoprint.comm.transport.serial.factory": __plugin_implementation__.printer_factory,
 		"octoprint.filemanager.extension_tree": __plugin_implementation__.get_extension_tree,
 		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.rewrite_gcode,
-		"octoprint.comm.protocol.gcode.sent": __plugin_implementation__.sending_gcode,
 		"octoprint.printer.sdcardupload": __plugin_implementation__.upload_to_sd
 	}
 
