@@ -198,10 +198,12 @@ class FlashForge(object):
 				data += self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
 
 		except usb1.USBError as usberror:
-			if not usberror.value == -7: # LIBUSB_ERROR_TIMEOUT:
-				raise FlashForgeError('USB Error readraw()', usberror.value)
+			if not usberror.value == -7:  # LIBUSB_ERROR_TIMEOUT:
+				raise FlashForgeError('USB Error readraw()', usberror)
+			else:
+				self._logger.debug("FlashForge.readraw() error: {}".format(usberror))
 
-		self._logger.debug("FlashForge.readraw() {}".format(data.replace('\r\n', '  ')))
+		self._logger.debug("FlashForge.readraw() {}".format(data.replace('\r\n', ' | ')))
 		return data
 
 
@@ -220,6 +222,7 @@ class FlashForge(object):
 		return False, data
 
 
+	# Obtain exclusive use of the connection for the current thread
 	def makeexclusive(self, exclusive):
 		if exclusive:
 			self._readlock.acquire()
@@ -233,7 +236,13 @@ class FlashForge(object):
 		self._logger.debug("FlashForge.close()")
 		self._incoming = None
 		self._plugin.on_disconnect()
-		try:
-			self._handle.releaseInterface(0)
-		except usb1.USBError as usberror:
-			raise FlashForgeError('Error releasing USB', usberror)
+		if self._handle:
+			try:
+				self._handle.releaseInterface(0)
+			except Exception:
+				pass
+			try:
+				self._handle.close()
+			except usb1.USBError as usberror:
+				raise FlashForgeError('Error releasing USB', usberror)
+			self._handle = None
