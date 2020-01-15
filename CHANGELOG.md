@@ -1,5 +1,13 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.8 (2020-1-14)
+* Made upload to SD card more robust
+* Made pausing/resuming/canceling SD card printing more robust
+* Tested on
+  * FlashForge Finder Firmware: V1.5 20170419
+  * FlashForge Dreamer Firmware: V2.6 20190320
+  * PowerSpec Ultra 3D Firmware: V2.4 20160407
+
 ## 0.1.7 (2019-12-9)
 * Added support for Dreamer NX (Thanks @mrspartak)
 * Support VID 0x0315 as PowerSpec (Thanks @twistedcustomdevel)
