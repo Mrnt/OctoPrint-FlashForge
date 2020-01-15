@@ -2,7 +2,7 @@
 
 ## 0.1.8 (2020-1-14)
 * **Changes to default settings and initial connection handling -
-check the configuration section and ensure the "Hello" command is set**
+check the configuration section and ensure the "Hello" command is set**: Go to Settings and under Serial Connection > Firmware & Protocol >Protocol fine tuning: open up the "Advanced" section and set the value for "Hello" command to `M601 S0`
 * Made upload to SD card more robust
 * Made pausing/resuming/canceling SD card printing more robust
 * Tested on
