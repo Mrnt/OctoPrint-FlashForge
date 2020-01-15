@@ -16,7 +16,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		"PowerSpec": {0x0001: "Ultra 3DPrinter"},
 		"Dremel": {0x8889: "Dremel IdeaBuilder"},
 		"FlashForge": {0x0001: "Dreamer", 0x000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2", 0x00ff: "PowerSpec Ultra"}}
-	FILE_PACKET_SIZE = 512
+	FILE_PACKET_SIZE = 1024
 
 
 	def __init__(self):
@@ -29,6 +29,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		octoprint.settings.default_settings['serial']['neverSendChecksum'] = True
 		octoprint.settings.default_settings['serial']['sdAlwaysAvailable'] = True
 		octoprint.settings.default_settings['serial']['timeout']['temperature'] = 2
+		octoprint.settings.default_settings['serial']['helloCommand'] = "M601 S0"
 
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
@@ -36,7 +37,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 		self._currentFile = None
 		self._upload_percent = 0
-		self.device_id = 0
+		self._vendor_id = 0
+		self._device_id = 0
 
 
 	# StartupPlugin
@@ -96,13 +98,13 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					vendor_name = self.VENDOR_IDS[vendor_id]
 					if device_id in self.PRINTER_IDS[vendor_name]:
 						self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
-						self.vendor_id = vendor_id
-						self.device_id = device_id
+						self._vendor_id = vendor_id
+						self._device_id = device_id
 						break
 					else:
 						raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id))
 
-		if self.device_id == 0:
+		if self._device_id == 0:
 			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
 
 
@@ -118,7 +120,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self.detect_printer()
 
 		self._comm = comm
-		serial_obj = flashforge.FlashForge(self, comm, self.vendor_id, self.device_id, read_timeout=float(read_timeout))
+		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
 		return serial_obj
 
 
@@ -148,7 +150,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
 
-			# M20 list SD card, M21 init SD card - do not do if we are busy
+			# M20 list SD card, M21 init SD card - do not do if we are busy, seems to cause issues
 			if (gcode == "M20" or gcode == "M21") and not self._serial_obj.is_ready():
 				cmd = []
 
@@ -158,64 +160,47 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				if comm_instance.isCancelling():
 					cmd = []
 
+			# M26 is sent by OctoPrint during Sd prints:
 			# M26 in Marlin = set SD card position : Flashforge = cancel
 			elif gcode == "M26":
-				# M26 S0 generated during cancel - use it to send cancel
+				# M26 S0 generated during OctoPrint cancel - use it to send cancel
 				if cmd == "M26 S0" and comm_instance.isCancelling():
 					cmd = [("M26", cmd_type), ("M119", "status_polling")]
 				else:
 					cmd = []
 
-			# M27 get SD card state
+			# also get printer status when getting SD progress
 			elif gcode == "M27":
-				if comm_instance.isCancelling():
-					# FF keeps showing SD card progress while cancelling, confusing OctoPrint
-					cmd = []
-
-			# M82 in Marlin = extruder abs positioning : Flashforge = undefined?
-			elif gcode == "M82":
-				cmd = []
-
-			# M82 in Marlin = extruder rel positioning : Flashforge = undefined?
-			elif gcode == "M83":
-				cmd = []
-
-			# M84 in Marlin = disable steppers : M18 in Flashforge
-			elif gcode == "M84":
-				cmd = ["M18"]
+				cmd = [("M119", "status_polling"), (cmd, cmd_type)]
 
 			# also get printer status when getting temp status
 			elif gcode == "M105":
 				cmd = [("M119", "status_polling"), (cmd, cmd_type)]
 
-			# M106 S0 in Marlin = fan off : Flashforge uses M107 for fan off
+			# M106 S0 is sent by OctoPrint control panel:
+			# M106 S0 in Marlin = fan off : FlashForge uses M107 for fan off
 			elif gcode == "M106":
 				if "S0" in cmd:
 					cmd = ["M107"]
 
-			# M108 in Marlin = stop loop & continue : Flashforge=change toolhead, no equivalent?
+			# M108 is sent by OctoPrint during SD cancel:
+			# M108 in Marlin = stop heat wait & continue : Flashforge M108 Tx = change toolhead, no equivalent?
 			elif gcode == "M108":
 				cmd = []
 
-			# M109 in Marlin = wait for extruder temp : M6 in Flashforge
-			elif gcode == "M109":
-				cmd = [cmd.replace("M109", "M6")]
-
-			# change the default hello - M601 S0 takes control via USB
+			# M110 is sent by OctoPrint as default hello:
+			# M110 Set line number/hello in Marlin : FlashForge uses M601 S0 to take control via USB
 			elif gcode == "M110":
-				cmd = ["M601 S0"]
+				cmd = []
 
 			# also get printer status when connecting
 			elif gcode == "M115":
 				cmd = [("M119", "status_polling"), ("M27", "sd_status_polling"), (cmd, cmd_type)]
 
-			# M190 in Marlin = wait for bed temp : M7 in Flashforge
-			elif gcode == "M190":
-				cmd = [cmd.replace("M190", "M7")]
-
-			# M400 in Marlin=wait for moves to finish : Flashforge=? - send something inert so on_M400_sent is triggered
+			# M400 is sent by OctoPrint on cancel:
+			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent is triggered in OctoPrint
 			elif gcode == "M400":
-				cmd = "M27"
+				cmd = "M119"
 
 		return cmd
 
@@ -238,9 +223,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			error = "could not start tx"
 
 			# make sure heaters are off
-			#self._serial_obj.sendcommand("M104 S0 T0")
-			#self._serial_obj.sendcommand("M104 S0 T1")
-			#self._serial_obj.sendcommand("M140 S0")
+			self._serial_obj.sendcommand("M104 S0 T0")
+			self._serial_obj.sendcommand("M104 S0 T1")
+			self._serial_obj.sendcommand("M140 S0")
 
 			ok, answer = self._serial_obj.sendcommand("M28 {} 0:/user/{}".format(file_size, remote_name), 5000)
 			if not ok:
@@ -297,13 +282,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 		gcode = ""
 		file_size = 0
-		remote_name = ""
-
-		existing_sd_files = map(lambda x: x[0], self._comm.getSdFiles())
-		remote_name = util.get_dos_filename(filename,
-							  existing_filenames=existing_sd_files,
-							  extension="gx",
-							  whitelisted_extensions=["gx"])
+		"""
+		unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote file
+		the same as the source and hope for the best
+		"""
+		remote_name = filename
 
 		file = open(path, "r")
 		gcode = file.read()
