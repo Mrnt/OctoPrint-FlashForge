@@ -3,9 +3,15 @@ import threading
 
 try:
 	import queue
+	import re
 except ImportError:
 	import Queue as queue
 
+
+regex_SDPrintProgress = re.compile("(?P<current>[0-9]+)/(?P<total>[0-9]+)")
+"""
+Regex matching SD print progress from M27.
+"""
 
 
 class FlashForgeError(Exception):
@@ -24,11 +30,12 @@ class FlashForge(object):
 	STATE_UNKNOWN = 0
 	STATE_READY = 1
 	STATE_BUILDING = 2
-	STATE_PAUSED = 3
-	STATE_HOMING = 4
-	STATE_BUSY = 5
+	STATE_SD_BUILDING = 3
+	STATE_SD_PAUSED = 4
+	STATE_HOMING = 5
+	STATE_BUSY = 6
 
-	PRINTING_STATES = (STATE_BUILDING, STATE_HOMING)
+	PRINTING_STATES = (STATE_BUILDING, STATE_SD_BUILDING, STATE_HOMING)
 
 
 	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
@@ -146,20 +153,42 @@ class FlashForge(object):
 
 		# translate returned data into something Octoprint understands
 		if len(data):
-			if 'CMD M119 ' in data:
+			if 'CMD M27 ' in data:
+				# need to filter out bogus SD print progress from cancelled or paused prints
+				if 'printing byte' in data and self._printerstate in [self.STATE_READY, self.STATE_SD_PAUSED]:
+					match = regex_SDPrintProgress.search(data)
+					if match:
+						try:
+							current = int(match.group("current"))
+							total = int(match.group("total"))
+						except:
+							pass
+						else:
+							if self._printerstate == self.STATE_READY and current >= total:
+								# Ultra 3D: after completing print it still indicates SD card progress
+								data = "CMD M27 Received.\r\nDone printing file\r\nok\r\n"
+							elif self._printerstate == self.STATE_SD_PAUSED:
+								# when paused still iindicates printing
+								data = "CMD M27 Received.\r\nPrinting paused\r\nok\r\n"
+							else:
+								# after print is cancelled M27 always looks like its printing from sd card
+								data = "CMD M27 Received.\r\nNot SD printing\r\nok\r\n"
+
+			elif 'CMD M114 ' in data:
+				# looks like get current position returns A: and B: for extruders?
+				data = data.replace(' A:', ' E0:').replace(' B:', ' E1:')
+
+			elif 'CMD M119 ' in data:
 				if 'MachineStatus: READY' in data:
 					self._printerstate = self.STATE_READY
 				elif 'MachineStatus: BUILDING_FROM_SD' in data:
 					if 'MoveMode: PAUSED' in data:
-						self._printerstate = self.STATE_PAUSED
+						self._printerstate = self.STATE_SD_PAUSED
 					else:
-						self._printerstate = self.STATE_BUILDING
+						self._printerstate = self.STATE_SD_BUILDING
 				else:
 					self._printerstate = self.STATE_BUSY
 
-			elif data.find("CMD M27 ") != -1 and not self._printerstate in self.PRINTING_STATES:
-				# after print is cancelled M27 always looks like its printing from sd card
-				data = "CMD M27 Received.\r\nok"
 
 			# turn data into list of lines
 			datalines = data.splitlines()
@@ -192,7 +221,6 @@ class FlashForge(object):
 		self._logger.debug("FlashForge.readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
 
 		try:
-			data = ''
 			# read data from USB until ok signals end or timeout
 			while not data.strip().endswith('ok'):
 				data += self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
@@ -214,12 +242,15 @@ class FlashForge(object):
 		if not readresponse:
 			return True, None
 
-		# read response
-		data = self.readraw(timeout)
-		if "ok\r\n" in data:
+		# read response, make sure we are getting the command we sent
+		gcode = "CMD {} ".format(cmd.split(" ", 1)[0])
+		response = " "
+		while response and gcode not in response:
+			response = self.readraw(timeout)
+		if "ok\r\n" in response:
 			self._logger.debug("FlashForge.sendcommand() got an ok")
-			return True, data
-		return False, data
+			return True, response
+		return False, response
 
 
 	# Obtain exclusive use of the connection for the current thread
