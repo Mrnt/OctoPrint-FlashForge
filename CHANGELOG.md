@@ -1,6 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
 ## 0.1.8 (2020-1-14)
+* **Changes to default settings and initial connection handling -
+check the configuration section and ensure the "Hello" command is set**
 * Made upload to SD card more robust
 * Made pausing/resuming/canceling SD card printing more robust
 * Tested on

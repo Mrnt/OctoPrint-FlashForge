@@ -40,7 +40,7 @@ The plugin attempts to set default values for the following (so on a fresh insta
     * Disable "Enable automatic firmware detection"
     * Enable "Always assume SD card is present"
     * Change "Send a checksum with the command" to "Never"
-    * under "Protocol fine tuning" click "Advanced" and make sure the "Hello" command is set to `M601 S0`
+    * Under "Protocol fine tuning" click "Advanced" and make sure the "Hello" command is set to `M601 S0`
 
 * Under OctoPrint > Settings > Printer Profiles:
 Edit the default printer profile or create a new one to reflect the number of extruders, build volume, etc.
