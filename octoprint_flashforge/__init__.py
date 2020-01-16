@@ -3,6 +3,8 @@ from __future__ import absolute_import
 
 import usb1
 import octoprint.plugin
+from octoprint.settings import settings, default_settings
+from octoprint.util import dict_merge
 from . import flashforge
 
 
@@ -21,16 +23,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	def __init__(self):
 		import logging
-		import octoprint.settings
+		global default_settings
 
-		# set FlashForge friendly default settings
-		#octoprint.settings.default_settings['serial']['waitForStartOnConnect'] = False
-		#octoprint.settings.default_settings['serial']['firmwareDetection'] = False
-		octoprint.settings.default_settings['serial']['neverSendChecksum'] = True
-		octoprint.settings.default_settings['serial']['sdAlwaysAvailable'] = True
-		octoprint.settings.default_settings['serial']['timeout']['temperature'] = 2
-		octoprint.settings.default_settings['serial']['helloCommand'] = "M601 S0"
-
+		_conn_settings = {'serial': {
+			'neverSendChecksum': True,
+			'sdAlwaysAvailable': True,
+			'timeout': {'temperature': 2},
+			'helloCommand': "M601 S0",
+			'abortHeatupOnCancel': False
+		}}
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
 		self._comm = None
@@ -39,11 +40,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._upload_percent = 0
 		self._vendor_id = 0
 		self._device_id = 0
+		self._conn_settings = _conn_settings
 
-
-	# StartupPlugin
-	def on_after_startup(self, *args, **kwargs):
-		self._logger.debug("on_after_startup")
+		default_settings = dict_merge(default_settings, _conn_settings)
 
 
 	##~~ SettingsPlugin mixin
@@ -110,6 +109,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	# Main serial connection hook - create our printer connection
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
+		# force the serial settings to be what we think is safe
+		settings().set(["serial"], self._conn_settings['serial'])
 
 		if not port == "AUTO":
 			return None
@@ -182,16 +183,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M106":
 				if "S0" in cmd:
 					cmd = ["M107"]
-
-			# M108 is sent by OctoPrint during SD cancel:
-			# M108 in Marlin = stop heat wait & continue : Flashforge M108 Tx = change toolhead, no equivalent?
-			elif gcode == "M108":
-				cmd = []
-
-			# M110 is sent by OctoPrint as default hello:
-			# M110 Set line number/hello in Marlin : FlashForge uses M601 S0 to take control via USB
-			elif gcode == "M110":
-				cmd = []
 
 			# also get printer status when connecting
 			elif gcode == "M115":
