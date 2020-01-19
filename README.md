@@ -35,12 +35,14 @@ The plugin attempts to set default values for the following (so on a fresh insta
     * Temperature Interval (polling) 2s When idle and a target temperature is set
     * Temperature Interval (autoreport) 2s Autoreport interval to request from firmware
 
-
 * Under OctoPrint > Settings > Serial Connection > Firmware & Protocol:
     * Disable "Enable automatic firmware detection"
     * Enable "Always assume SD card is present"
     * Change "Send a checksum with the command" to "Never"
     * Under "Protocol fine tuning" click "Advanced" and make sure the "Hello" command is set to `M601 S0`
+
+* Under OctoPrint > Settings > Serial Connection > Behaviour:
+    * Disable "Attempt to abort any blocking heatups on cancel via M108."
 
 * Under OctoPrint > Settings > Printer Profiles:
 Edit the default printer profile or create a new one to reflect the number of extruders, build volume, etc.
