@@ -12,9 +12,7 @@ Based on work by [Noneus](https://github.com/Noneus)
     - Move extruder, bed
     - Turn fans on and off
     - Extrude, retract
-- Upload a FlashPrint prepared .gx file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, cancel the print using the respective buttons.
-
-
+- Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
 
 ## Setup
 
@@ -37,14 +35,17 @@ The plugin attempts to set default values for the following (so on a fresh insta
     * Temperature Interval (polling) 2s When idle and a target temperature is set
     * Temperature Interval (autoreport) 2s Autoreport interval to request from firmware
 
-
 * Under OctoPrint > Settings > Serial Connection > Firmware & Protocol:
     * Disable "Enable automatic firmware detection"
     * Enable "Always assume SD card is present"
     * Change "Send a checksum with the command" to "Never"
+    * Under "Protocol fine tuning" click "Advanced" and make sure the "Hello" command is set to `M601 S0`
+
+* Under OctoPrint > Settings > Serial Connection > Behaviour:
+    * Disable "Attempt to abort any blocking heatups on cancel via M108."
 
 * Under OctoPrint > Settings > Printer Profiles:
-Edit the default printer profile or create a new to reflect the number of extruders, build volume, etc.
+Edit the default printer profile or create a new one to reflect the number of extruders, build volume, etc.
 
 * Under OctoPrint > Settings > Plugin Manager:
 Verify that the FlashForge plugin is enabled
@@ -64,7 +65,7 @@ If plugin does not appear in Plugin Manager list `libusb1` may need to be instal
 
 * Verify that the Serial Connection settings are set correctly, in particular the "Send a checksum with the command" setting.
 
-* Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set octoprint.plugins.flashforge to "DEBUG" and then click "Save") to help troubleshoot connection issues.
+* Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set [octoprint.plugins.flashforge](./documentation/LoggingSettings.png) to "DEBUG" and then click "Save") to help troubleshoot connection issues.
 
 * After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log) for clues.
 

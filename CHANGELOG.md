@@ -1,5 +1,25 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.9 (2020-1-15)
+* Corrected version number in setup file
+
+## 0.1.8 (2020-1-14)
+* **Changes to default settings and initial connection handling -
+check the configuration section and ensure the "Hello" command is set**: Go to Settings and under Serial Connection > Firmware & Protocol >Protocol fine tuning: open up the "Advanced" section and set the value for "Hello" command to `M601 S0`
+* Made upload to SD card more robust
+* Made pausing/resuming/canceling SD card printing more robust
+* Tested on
+  * FlashForge Finder Firmware: V1.5 20170419
+  * FlashForge Dreamer Firmware: V2.6 20190320
+  * PowerSpec Ultra 3D Firmware: V2.4 20160407
+
+## 0.1.7 (2019-12-9)
+* Added support for Dreamer NX (Thanks @mrspartak)
+* Support VID 0x0315 as PowerSpec (Thanks @twistedcustomdevel)
+
+## 0.1.6 (2019-12-9)
+* Support FlashForge VID 0x0315 (Thanks @twistedcustomdevel)
+
 ## 0.1.5 (2019-10-10)
 * Support FlashForge Inventor
 
