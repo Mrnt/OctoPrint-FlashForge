@@ -116,16 +116,18 @@ class FlashForge(object):
 		data_len = len(data)
 		self._writelock.acquire()
 
+		'''
 		if re.match(r'^G\d+', data):
 			while not self.is_ready():
 				try:
 					self._logger.debug("FlashForge.write() wait for ready")
 					# success, result = self.sendcommand('~M119\r\n')
 					self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~M119\r\n', int(self._write_timeout * 1000.0))
-					time.sleep(0.5)
+					time.sleep(0.3)
 				except usb1.USBError as usberror:
 					self._writelock.release()
 					raise FlashForgeError('USB Error write()', usberror)
+		'''
 
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
@@ -198,7 +200,7 @@ class FlashForge(object):
 				data = data.replace(' A:', ' E0:').replace(' B:', ' E1:')
 
 			elif 'CMD M119 ' in data:
-				if 'MachineStatus: READY' in data:
+				if 'MachineStatus: READY' in data and 'MoveMode: READY' in data:
 					self._printerstate = self.STATE_READY
 				elif 'MachineStatus: BUILDING_FROM_SD' in data:
 					if 'MoveMode: PAUSED' in data:
@@ -207,18 +209,21 @@ class FlashForge(object):
 						self._printerstate = self.STATE_SD_BUILDING
 				else:
 					self._printerstate = self.STATE_BUSY
+				data = ''
 
+			if len(data):
+				# turn data into list of lines
+				datalines = data.splitlines()
+				for i, line in enumerate(datalines):
+					self._incoming.put(line)
 
-			# turn data into list of lines
-			datalines = data.splitlines()
-			for i, line in enumerate(datalines):
-				self._incoming.put(line)
-
-				# if M20 (list SD card files) does not return anything, make it look like an empty file list
-				if 'CMD M20 ' in line and datalines[i+1] and datalines[i+1] == "ok":
-					# fetch SD card list does not get anything so fake out a result
-					self._incoming.put('Begin file list')
-					self._incoming.put('End file list')
+					# if M20 (list SD card files) does not return anything, make it look like an empty file list
+					if 'CMD M20 ' in line and datalines[i+1] and datalines[i+1] == "ok":
+						# fetch SD card list does not get anything so fake out a result
+						self._incoming.put('Begin file list')
+						self._incoming.put('End file list')
+			else:
+				self._incoming.put(data)
 
 		else:
 			self._incoming.put(data)

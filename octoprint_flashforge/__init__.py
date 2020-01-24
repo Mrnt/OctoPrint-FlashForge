@@ -36,10 +36,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._device_id = 0
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
+			'firmwareDetection': False,
 			'neverSendChecksum': True,
 			'sdAlwaysAvailable': True,
 			'timeout': {
 				'temperature': 2,
+				'temperatureTargetSet': 2,
 				'temperatureAutoreport': 0,
 				'sdStatusAutoreport': 0
 			},
@@ -144,9 +146,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		import threading, time
 
 		def keep_alive():
+			# if the printer does not receive something at least every 3 seconds (even while printing) it drops the
+			# connection...
 			while self._serial_obj:
-				time.sleep(2)
 				self._serial_obj.write("M119")
+				time.sleep(2)
 
 		thread = threading.Thread(target=keep_alive, name="Keep Alive")
 		thread.daemon = True
@@ -166,7 +170,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			if not re.match(r'^[MG]\d+', cmd):
 				# most likely part of the header in a .gx FlashPrint file
 				self._logger.debug("rewrite_gcode(): unrecognized command")
-				return "M119"
+				return []
 
 			self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
 
@@ -222,12 +226,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			# also get printer status when connecting
 			elif gcode == "M115":
-				cmd = [("M119", "status_polling"), ("M27", "sd_status_polling"), (cmd, cmd_type)]
+				cmd = [("M27", "sd_status_polling"), (cmd, cmd_type)]
 
 			# M400 is sent by OctoPrint on cancel:
 			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent is triggered in OctoPrint
 			elif gcode == "M400":
-				cmd = "M119"
+				cmd = "M105"
 
 			'''
 			elif re.match(r'^G\d+', cmd):
