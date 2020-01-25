@@ -34,17 +34,18 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._upload_percent = 0
 		self._vendor_id = 0
 		self._device_id = 0
+		self._temp_interval = 0
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
 			'firmwareDetection': False,
-			'neverSendChecksum': True,
 			'sdAlwaysAvailable': True,
-			'timeout': {
-				'temperature': 2,
-				'temperatureTargetSet': 2,
-				'temperatureAutoreport': 0,
-				'sdStatusAutoreport': 0
-			},
+			'neverSendChecksum': True,
+			#'timeout': {
+				#'temperature': 2,
+				#'temperatureTargetSet': 2,
+				#'temperatureAutoreport': 0,
+				#'sdStatusAutoreport': 0
+			#},
 			'helloCommand': "M601 S0",
 			'abortHeatupOnCancel': False
 		}
@@ -143,14 +144,21 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("on_connect()")
 		self._serial_obj = serial_obj
 
-		import threading, time
+		import threading
+		import time
 
 		def keep_alive():
-			# if the printer does not receive something at least every 3 seconds (even while printing) it drops the
+			# if the printer does not receive something less than every 4 seconds (even while printing) it drops the
 			# connection...
 			while self._serial_obj:
+				if self._temp_interval:
+					self._serial_obj.write("M105")
 				self._serial_obj.write("M119")
-				time.sleep(2)
+				if self._temp_interval > 0 and self._temp_interval < 4:
+					keep_alive = self._temp_interval
+				else:
+					keep_alive = 3
+				time.sleep(keep_alive)
 
 		thread = threading.Thread(target=keep_alive, name="Keep Alive")
 		thread.daemon = True
@@ -205,6 +213,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M84":
 				cmd = ["M18"]
 
+			# M105 get temp
+			elif gcode == "M105":
+				# if we are generating automatically in the keep alive then skip this
+				if self._temp_interval:
+					cmd = []
+
 			# M106 S0 is sent by OctoPrint control panel:
 			# M106 S0 in Marlin = fan off : FlashForge uses M107 for fan off
 			elif gcode == "M106":
@@ -228,18 +242,21 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M115":
 				cmd = [("M27", "sd_status_polling"), (cmd, cmd_type)]
 
-			# M400 is sent by OctoPrint on cancel:
-			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent is triggered in OctoPrint
-			elif gcode == "M400":
-				cmd = "M105"
+			# M119 get status we generate automatically so skip this
+			elif gcode == "M119":
+				cmd = []
 
-			'''
-			elif re.match(r'^G\d+', cmd):
-				while not self._serial_obj.is_ready():
-					self._logger.debug("rewrite_gcode(): waiting for ready")
-					time.sleep(0.5)
-				cmd = [("M119", "status_polling"), (cmd, cmd_type)]
-			'''
+			# M155 set temp autoreport interval - we are faking this out and generating M105 requests as part of
+			# the keep alive
+			elif gcode == "M155":
+				self._temp_interval = int(re.search("S([0-9]+)", cmd).group(1))
+				cmd = []
+
+			# M400 is sent by OctoPrint on cancel:
+			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent
+			# is triggered in OctoPrint
+			elif gcode == "M400":
+				cmd = "M27"
 
 			if cmd == []:
 				self._logger.debug("rewrite_gcode(): dropping command")
