@@ -40,12 +40,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			'firmwareDetection': False,
 			'sdAlwaysAvailable': True,
 			'neverSendChecksum': True,
-			#'timeout': {
-				#'temperature': 2,
-				#'temperatureTargetSet': 2,
-				#'temperatureAutoreport': 0,
-				#'sdStatusAutoreport': 0
-			#},
+			'timeout': {
+				'temperature': 2,
+				'temperatureTargetSet': 2,
+				'sdStatusAutoreport': 0
+			},
 			'helloCommand': "M601 S0",
 			'abortHeatupOnCancel': False
 		}
@@ -152,6 +151,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# connection...
 			while self._serial_obj:
 				if self._temp_interval:
+					# if we do the fake auto reporting of temp OctoPrint will get something during long operations to
+					# indicate the printer is still alive
 					self._serial_obj.write("M105")
 				self._serial_obj.write("M119")
 				if self._temp_interval > 0 and self._temp_interval < 4:
@@ -193,7 +194,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					cmd = []
 
 			# M26 is sent by OctoPrint during Sd prints:
-			# M26 in Marlin = set SD card position : Flashforge = cancel
+			# M26 in Marlin = set SD card position : FlashForge = cancel
 			elif gcode == "M26":
 				# M26 S0 generated during OctoPrint cancel - use it to send cancel
 				if cmd == "M26 S0" and comm_instance.isCancelling():
@@ -201,15 +202,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				else:
 					cmd = []
 
-			# M82 in Marlin = extruder abs positioning : Flashforge = undefined?
+			# M82 in Marlin = extruder abs positioning : FlashForge = undefined?
 			elif gcode == "M82":
 				cmd = []
 
-			# M83 in Marlin = extruder rel positioning : Flashforge = undefined?
+			# M83 in Marlin = extruder rel positioning : FlashForge = undefined?
 			elif gcode == "M83":
 				cmd = []
 
-			# M84 in Marlin = disable steppers : M18 in Flashforge
+			# M84 in Marlin = disable steppers : M18 is FlashForge equivalent
 			elif gcode == "M84":
 				cmd = ["M18"]
 
@@ -220,16 +221,17 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					cmd = []
 
 			# M106 S0 is sent by OctoPrint control panel:
-			# M106 S0 in Marlin = fan off : FlashForge uses M107 for fan off
+			# M106 S0 in Marlin = fan off : M107 is FlashForge equivalent
 			elif gcode == "M106":
 				if "S0" in cmd:
 					cmd = ["M107"]
 
-			# M108 in Marlin = stop loop & continue : Flashforge=change toolhead, no equivalent?
-			elif cmd == "M108":
+			# M108 is sent by OctoPrint during SD cancel if abortHeatupOnCancel is set:
+			# M108 in Marlin = stop heat wait & continue : FlashForge M108 Tx = change toolhead, no equivalent?
+			elif gcode == "M108":
 				cmd = []
 
-			# M109 in Marlin = wait for extruder temp : M6 in Flashforge
+			# M109 in Marlin = wait for extruder temp : M6 in FlashForge (this may need to be moved to the write() method)
 			elif gcode == "M109":
 				cmd = [cmd.replace("M109", "M6")]
 
@@ -244,12 +246,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			# M119 get status we generate automatically so skip this
 			elif gcode == "M119":
-				cmd = []
-
-			# M155 set temp autoreport interval - we are faking this out and generating M105 requests as part of
-			# the keep alive
-			elif gcode == "M155":
-				self._temp_interval = int(re.search("S([0-9]+)", cmd).group(1))
 				cmd = []
 
 			# M400 is sent by OctoPrint on cancel:
@@ -325,7 +321,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				pass
 
 			if error:
-				self._logger.debug("Upload failed: {}".format(error))
+				self._logger.info("Upload failed: {}".format(error))
 				sd_upload_failed(filename, remote_name, 10)
 				self._serial_obj.makeexclusive(False)
 				raise flashforge.FlashForgeError(error)

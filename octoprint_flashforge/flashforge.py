@@ -12,6 +12,10 @@ regex_SDPrintProgress = re.compile("(?P<current>[0-9]+)/(?P<total>[0-9]+)")
 """
 Regex matching SD print progress from M27.
 """
+regex_gcode = re.compile("^(?P<gcode>[GM]\d+)")
+"""
+Regex matching gcodes in write().
+"""
 
 
 class FlashForgeError(Exception):
@@ -41,7 +45,7 @@ class FlashForge(object):
 	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
 		import logging
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
-		self._logger.debug("FlashForge.__init__()")
+		self._logger.debug("__init__()")
 
 		self._plugin = plugin
 		self._comm = comm
@@ -76,7 +80,7 @@ class FlashForge(object):
 
 	@property
 	def timeout(self):
-		self._logger.debug("FlashForge.timeout()")
+		self._logger.debug("timeout()")
 		return self._read_timeout
 
 
@@ -110,33 +114,34 @@ class FlashForge(object):
 	def write(self, data):
 		import time
 
-		self._logger.debug("FlashForge.write() called by thread {}".format(threading.currentThread().getName()))
-
 		# save the length for return on success
 		data_len = len(data)
-		self._writelock.acquire()
 
-		'''
-		if re.match(r'^G\d+', data):
-			while not self.is_ready():
-				try:
-					self._logger.debug("FlashForge.write() wait for ready")
-					# success, result = self.sendcommand('~M119\r\n')
-					self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~M119\r\n', int(self._write_timeout * 1000.0))
-					time.sleep(0.3)
-				except usb1.USBError as usberror:
-					self._writelock.release()
-					raise FlashForgeError('USB Error write()', usberror)
-		'''
+		match = regex_gcode.search(data)
+		if match:
+			try:
+				gcode = match.group("gcode")
+			except:
+				pass
+			else:
+				if gcode == "M27":
+					# if we are getting SD state make sure we have the latest printer status
+					self.write('M119')
+				elif gcode == "M155":
+					# we don't support M155 but have to handle it here instead rewrite() so that OctoPrint thinks it sent it
+					self._plugin._temp_interval = float(re.search("S([0-9]*\.?[0-9]+)", data).group(1))
+					data = "M155 S0"
+
+		self._logger.debug("write() called by thread {}".format(threading.currentThread().getName()))
+
+		self._writelock.acquire()
 
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
 
 		try:
-			self._logger.debug("FlashForge.write() {0}".format(data))
+			self._logger.debug("write() {0}".format(data))
 			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
-			# if re.match(r'^(M6|M7|G28)', data):
-			#	self._printerstate = self.STATE_UNKNOWN
 			self._writelock.release()
 			return data_len
 		except usb1.USBError as usberror:
@@ -145,7 +150,7 @@ class FlashForge(object):
 
 
 	def writeraw(self, data):
-		self._logger.debug("FlashForge.writeraw() called by thread {}".format(threading.currentThread().getName()))
+		self._logger.debug("writeraw() called by thread {}".format(threading.currentThread().getName()))
 
 		try:
 			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, data)
@@ -160,7 +165,7 @@ class FlashForge(object):
 		Returns:
 			List of lines returned from the printer
 		"""
-		self._logger.debug("FlashForge.readline() called by thread {}".format(threading.currentThread().getName()))
+		self._logger.debug("readline() called by thread {}".format(threading.currentThread().getName()))
 
 		self._readlock.acquire()
 
@@ -207,7 +212,8 @@ class FlashForge(object):
 
 			elif 'CMD M115 ' in data:
 				# Try to make the firmware response more readable by OctoPrint
-				# Fake autotemp reporting capability - we can do it as part of the keep alive
+				# Fake autotemp reporting capability - we can do it as part of the keep alive. Means we will still get
+				# temp updates while OctoPrint is waiting for blocking commands to be processed in the queue
 				data = data.replace('Firmware:', 'FIRMWARE_NAME: FlashForge VER:').\
 					replace('\r\nok', '\r\nCap:AUTOREPORT_TEMP:1\r\nok')
 
@@ -226,6 +232,7 @@ class FlashForge(object):
 
 			if len(data):
 				# turn data into list of lines
+				self._logger.debug("readline() returning {}".format(data.replace('\r\n', ' | ')))
 				datalines = data.splitlines()
 				for i, line in enumerate(datalines):
 					self._incoming.put(line)
@@ -255,7 +262,7 @@ class FlashForge(object):
 		data = ''
 		if timeout == -1:
 			timeout = int(self._read_timeout * 1000.0)
-		self._logger.debug("FlashForge.readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
+		self._logger.debug("readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
 
 		try:
 			# read data from USB until ok signals end or timeout
@@ -266,14 +273,14 @@ class FlashForge(object):
 			if not usberror.value == -7:  # LIBUSB_ERROR_TIMEOUT:
 				raise FlashForgeError('USB Error readraw()', usberror)
 			else:
-				self._logger.debug("FlashForge.readraw() error: {}".format(usberror))
+				self._logger.debug("readraw() error: {}".format(usberror))
 
-		self._logger.debug("FlashForge.readraw() {}".format(data.replace('\r\n', ' | ')))
+		self._logger.debug("readraw() {}".format(data.replace('\r\n', ' | ')))
 		return data
 
 
 	def sendcommand(self, cmd, timeout=-1, readresponse=True):
-		self._logger.debug("FlashForge.sendcommand() {}".format(cmd).encode())
+		self._logger.debug("sendcommand() {}".format(cmd).encode())
 
 		self.writeraw("~{}\r\n".format(cmd).encode())
 		if not readresponse:
@@ -285,7 +292,7 @@ class FlashForge(object):
 		while response and gcode not in response:
 			response = self.readraw(timeout)
 		if "ok\r\n" in response:
-			self._logger.debug("FlashForge.sendcommand() got an ok")
+			self._logger.debug("sendcommand() got an ok")
 			return True, response
 		return False, response
 
@@ -301,7 +308,7 @@ class FlashForge(object):
 
 
 	def close(self):
-		self._logger.debug("FlashForge.close()")
+		self._logger.debug("close()")
 		self._incoming = None
 		self._plugin.on_disconnect()
 		if self._handle:
