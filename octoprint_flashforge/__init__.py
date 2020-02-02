@@ -14,7 +14,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	VENDOR_IDS = {0x0315: "PowerSpec", 0x2a89: "Dremel", 0x2b71: "FlashForge"}
 	PRINTER_IDS = {
 		"PowerSpec": {0x0001: "Ultra 3DPrinter"},
-		"Dremel": {0x8889: "Dremel IdeaBuilder"},
+		"Dremel": {0x8889: "Dremel IdeaBuilder", 0x888d: "Dremel 3D45"},
 		"FlashForge": {0x0001: "Dreamer", 0x000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2", 0x00ff: "PowerSpec Ultra"}}
 	FILE_PACKET_SIZE = 1024
 
