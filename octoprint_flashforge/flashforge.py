@@ -51,6 +51,7 @@ class FlashForge(object):
 		self._comm = comm
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
+		self._temp_interval = 0
 		self._incoming = queue.Queue()
 		self._readlock = threading.Lock()
 		self._writelock = threading.Lock()
@@ -95,6 +96,29 @@ class FlashForge(object):
 		return self._write_timeout
 
 
+	@write_timeout.setter
+	def write_timeout(self, value):
+		self._logger.debug("Setting write timeout to {}s".format(value))
+		self._write_timeout = value
+
+
+	def keep_alive(self):
+		exit_flag = threading.Event()
+		keep_alive = 3.0
+		while not exit_flag.wait(timeout=keep_alive) and self._handle:
+			# if the printer does not receive something less than every 4 seconds (even while printing) it drops the
+			# connection...
+			if self._temp_interval:
+				# if we do the fake auto reporting of temp OctoPrint will get something during long operations to
+				# indicate the printer is still alive
+				self.write("M105")
+			self.write("M119")
+			if self._temp_interval > 0 and self._temp_interval < 4:
+				keep_alive = float(self._temp_interval)
+			else:
+				keep_alive = 3
+
+
 	def is_ready(self):
 		self._logger.debug("is_ready()")
 		return self._printerstate == self.STATE_READY
@@ -105,15 +129,11 @@ class FlashForge(object):
 		return self._printerstate in self.PRINTING_STATES
 
 
-	@write_timeout.setter
-	def write_timeout(self, value):
-		self._logger.debug("Setting write timeout to {}s".format(value))
-		self._write_timeout = value
+	def temp_reporting(self):
+		return self._temp_interval
 
 
 	def write(self, data):
-		import time
-
 		# save the length for return on success
 		data_len = len(data)
 
@@ -129,7 +149,7 @@ class FlashForge(object):
 					self.write('M119')
 				elif gcode == "M155":
 					# we don't support M155 but have to handle it here instead rewrite() so that OctoPrint thinks it sent it
-					self._plugin._temp_interval = float(re.search("S([0-9]*\.?[0-9]+)", data).group(1))
+					self._temp_interval = int(re.search("S([0-9]+)", data).group(1))
 					data = "M155 S0"
 
 		self._logger.debug("write() called by thread {}".format(threading.currentThread().getName()))
@@ -205,7 +225,7 @@ class FlashForge(object):
 				data = data.replace(' A:', ' E0:').replace(' B:', ' E1:')
 
 			elif 'CMD M105 ' in data:
-				if self._plugin._temp_interval:
+				if self._temp_interval:
 					# this was generated as an auto temp report by our keep alive so filter out the CMD and OK
 					# so as not to confuse the OctoPrint buffer counter
 					data = data.replace('CMD M105 Received.\r\n', '').replace('\r\nok', '')

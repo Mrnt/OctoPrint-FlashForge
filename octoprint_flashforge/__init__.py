@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import usb1
 import re
 import octoprint.plugin
-from octoprint.settings import settings, default_settings
+from octoprint.settings import default_settings
 from octoprint.util import dict_merge
 from . import flashforge
 
@@ -24,7 +24,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	def __init__(self):
 		import logging
-		global default_settings
 
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
@@ -34,7 +33,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._upload_percent = 0
 		self._vendor_id = 0
 		self._device_id = 0
-		self._temp_interval = 0
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
 			'firmwareDetection': False,
@@ -46,9 +44,13 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				'sdStatusAutoreport': 0
 			},
 			'helloCommand': "M601 S0",
-			'abortHeatupOnCancel': False
+			'abortHeatupOnCancel': False			# prevent sending of M108 command which doesn't work
+		}
+		self._feature_settings = {
+			'autoUppercaseBlacklist': ['M146']		# LED control requires lowercase r,g,b
 		}
 		default_settings["serial"] = dict_merge(default_settings["serial"], self._conn_settings)
+		default_settings["feature"] = dict_merge(default_settings["feature"], self._feature_settings)
 
 
 	##~~ SettingsPlugin mixin
@@ -120,11 +122,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		if not self.detect_printer():
 			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
 
-		# found a printer - force the serial settings to be what we think is safe
-		# (this will prob only work on the second connection attempt because the settings have already been loaded into the comm instance at ths point)
-		#settings().set(["serial"], self._conn_settings)
-		#settings().save()
-
 		self._comm = comm
 		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
 		return serial_obj
@@ -140,28 +137,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 
 	def on_connect(self, serial_obj):
+		import threading
+
 		self._logger.debug("on_connect()")
 		self._serial_obj = serial_obj
 
-		import threading
-		import time
-
-		def keep_alive():
-			# if the printer does not receive something less than every 4 seconds (even while printing) it drops the
-			# connection...
-			while self._serial_obj:
-				if self._temp_interval:
-					# if we do the fake auto reporting of temp OctoPrint will get something during long operations to
-					# indicate the printer is still alive
-					self._serial_obj.write("M105")
-				self._serial_obj.write("M119")
-				if self._temp_interval > 0 and self._temp_interval < 4:
-					keep_alive = self._temp_interval
-				else:
-					keep_alive = 3
-				time.sleep(keep_alive)
-
-		thread = threading.Thread(target=keep_alive, name="Keep Alive")
+		thread = threading.Thread(target=serial_obj.keep_alive, name="Keep Alive")
 		thread.daemon = True
 		thread.start()
 
@@ -210,6 +191,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M83":
 				cmd = []
 
+			# M84 by default sent when OctoPrint cancelling print
 			# M84 in Marlin = disable steppers : M18 is FlashForge equivalent
 			elif gcode == "M84":
 				cmd = ["M18"]
@@ -217,7 +199,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# M105 get temp
 			elif gcode == "M105":
 				# if we are generating automatically in the keep alive then skip this
-				if self._temp_interval:
+				if self._serial_obj.temp_reporting():
 					cmd = []
 
 			# M106 S0 is sent by OctoPrint control panel:
@@ -336,10 +318,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 		gcode = ""
 		file_size = 0
-		"""
-		unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote file
-		the same as the source and hope for the best
-		"""
+		# unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote file
+		# the same as the source and hope for the best
 		remote_name = filename
 
 		file = open(path, "r")
