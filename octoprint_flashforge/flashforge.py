@@ -62,7 +62,7 @@ class FlashForge(object):
 			self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
 		except usb1.USBError as usberror:
 			if usberror.value == -3:
-				raise FlashForgeError(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\r\n\r\n"
+				raise FlashForgeError("\r\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\r\n\r\n"
 									  "Unable to connect to FlashForge printer - permission error.\r\n"
 									  "On OctoPi/Linux add the following line to\r\n"
 									  " /etc/udev/rules.d/99-octoprint.rules:\r\n\r\n"
