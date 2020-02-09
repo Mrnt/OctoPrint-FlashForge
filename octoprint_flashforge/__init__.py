@@ -117,11 +117,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		if not self.detect_printer():
 			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
 
-		# found a printer - force the serial settings to be what we think is safe
-		# (this will prob only work on the second connection attempt because the settings have already been loaded into the comm instance at ths point)
-		settings().set(["serial"], self._conn_settings)
-		settings().save()
-
 		self._comm = comm
 		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
 		return serial_obj
