@@ -3,6 +3,8 @@ from __future__ import absolute_import
 
 import usb1
 import octoprint.plugin
+from octoprint.settings import settings, default_settings
+from octoprint.util import dict_merge
 from . import flashforge
 
 
@@ -21,15 +23,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	def __init__(self):
 		import logging
-		import octoprint.settings
-
-		# set FlashForge friendly default settings
-		#octoprint.settings.default_settings['serial']['waitForStartOnConnect'] = False
-		#octoprint.settings.default_settings['serial']['firmwareDetection'] = False
-		octoprint.settings.default_settings['serial']['neverSendChecksum'] = True
-		octoprint.settings.default_settings['serial']['sdAlwaysAvailable'] = True
-		octoprint.settings.default_settings['serial']['timeout']['temperature'] = 2
-		octoprint.settings.default_settings['serial']['helloCommand'] = "M601 S0"
+		global default_settings
 
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__")
@@ -39,11 +33,19 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._upload_percent = 0
 		self._vendor_id = 0
 		self._device_id = 0
-
-
-	# StartupPlugin
-	def on_after_startup(self, *args, **kwargs):
-		self._logger.debug("on_after_startup")
+		# FlashForge friendly default connection settings
+		self._conn_settings = {
+			'neverSendChecksum': True,
+			'sdAlwaysAvailable': True,
+			'timeout': {
+				'temperature': 2,
+				'temperatureAutoreport': 0,
+				'sdStatusAutoreport': 0
+			},
+			'helloCommand': "M601 S0",
+			'abortHeatupOnCancel': False
+		}
+		default_settings["serial"] = dict_merge(default_settings["serial"], self._conn_settings)
 
 
 	##~~ SettingsPlugin mixin
@@ -67,7 +69,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		# Plugin here. See https://github.com/foosel/OctoPrint/wiki/Plugin:-Software-Update
 		# for details.
 		return dict(
-			helloworld=dict(
+			flashforge=dict(
 				displayName="FlashForge Plugin",
 				displayVersion=self._plugin_version,
 
@@ -85,6 +87,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	# Look for a supported printer
 	def detect_printer(self):
+		self._device_id = 0
 		with usb1.USBContext() as usbcontext:
 			for device in usbcontext.getDeviceIterator(skip_on_error=True):
 				vendor_id = device.getVendorID()
@@ -103,21 +106,16 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 						break
 					else:
 						raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id))
-
-		if self._device_id == 0:
-			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
+		return self._device_id != 0
 
 
 	# Main serial connection hook - create our printer connection
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
-
 		if not port == "AUTO":
 			return None
 
-		self._logger.debug("printer_factory")
-		self._logger.debug("printer_factory port {}s".format(port))
-
-		self.detect_printer()
+		if not self.detect_printer():
+			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
 
 		self._comm = comm
 		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
@@ -183,12 +181,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				if "S0" in cmd:
 					cmd = ["M107"]
 
-			# M108 is sent by OctoPrint during SD cancel:
-			# M108 in Marlin = stop heat wait & continue : Flashforge M108 Tx = change toolhead, no equivalent?
-			elif gcode == "M108":
-				cmd = []
-
-			# M110 is sent by OctoPrint as default hello:
+			# M110 is sent by OctoPrint as default hello but also when connected:
 			# M110 Set line number/hello in Marlin : FlashForge uses M601 S0 to take control via USB
 			elif gcode == "M110":
 				cmd = []

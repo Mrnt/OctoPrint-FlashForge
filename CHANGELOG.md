@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.10 (2020-2-9)
+* Set USb buffer to a sensible size
+
 ## 0.1.9 (2020-1-15)
 * Corrected version number in setup file
 
