@@ -254,7 +254,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 				if not error:
 					result, response = self._serial_obj.sendcommand("M29", 10000)
-					if result and "CMD M28" in response:
+					if result and "CMD M28" in response or "CMD M29" in response:
 						response = self._serial_obj.readraw(1000)
 					if result and "failed" not in response:
 						sd_upload_succeeded(filename, remote_name, 10)
