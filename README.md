@@ -44,6 +44,9 @@ The plugin attempts to set default values for the following (so on a fresh insta
 * Under OctoPrint > Settings > Serial Connection > Behaviour:
     * Disable "Attempt to abort any blocking heatups on cancel via M108."
 
+* Under OctoPrint > Settings > GCODE Scripts:
+    * Make sure all the script fields are empty (the default "After print job is cancelled" script generates commands that causes the printer to hang)
+
 * Under OctoPrint > Settings > Printer Profiles:
 Edit the default printer profile or create a new one to reflect the number of extruders, build volume, etc.
 
