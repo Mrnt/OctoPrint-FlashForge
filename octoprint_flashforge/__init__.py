@@ -142,7 +142,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("on_connect()")
 		self._serial_obj = serial_obj
 
-		thread = threading.Thread(target=serial_obj.keep_alive, name="Keep Alive")
+		thread = threading.Thread(target=serial_obj.keep_alive, name="FlashForge.Keep_Alive")
 		thread.daemon = True
 		thread.start()
 
@@ -330,7 +330,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
 		sd_upload_started(filename, remote_name)
 
-		thread = threading.Thread(target=process_upload, name="SD Uploader")
+		thread = threading.Thread(target=process_upload, name="FlashForge.SD_Uploader")
 		thread.daemon = True
 		thread.start()
 
