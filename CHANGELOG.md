@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.11 (2020-4-2)
+* Added support for FlashForge Creator Max (Thanks @pfemiani)
+
 ## 0.1.10 (2020-2-9)
 * Set USb buffer to a sensible size
 
