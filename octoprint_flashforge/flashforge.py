@@ -25,7 +25,7 @@ class FlashForge(object):
 	ENDPOINT_CMD_OUT = 0x01
 	ENDPOINT_DATA_IN = 0x83
 	ENDPOINT_DATA_OUT = 0x03
-	BUFFER_SIZE = 128
+	BUFFER_SIZE = 512
 
 	STATE_UNKNOWN = 0
 	STATE_READY = 1
@@ -168,7 +168,7 @@ class FlashForge(object):
 								# Ultra 3D: after completing print it still indicates SD card progress
 								data = "CMD M27 Received.\r\nDone printing file\r\nok\r\n"
 							elif self._printerstate == self.STATE_SD_PAUSED:
-								# when paused still iindicates printing
+								# when paused still indicates printing
 								data = "CMD M27 Received.\r\nPrinting paused\r\nok\r\n"
 							else:
 								# after print is cancelled M27 always looks like its printing from sd card
