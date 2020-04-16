@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.13 (2020-4-16)
+* Added additional support for PowerSpec Ultra 3D (Thanks @kelkin)
+
 ## 0.1.12 (2020-4-16)
 * Added support for FlashForge Finder v2 (Thanks @Spillmaker)
 
