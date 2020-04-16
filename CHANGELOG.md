@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.12 (2020-4-16)
+* Added support for FlashForge Finder v2 (Thanks @Spillmaker)
+
 ## 0.1.11 (2020-4-2)
 * Added support for FlashForge Creator Max (Thanks @pfemiani)
 
