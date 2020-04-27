@@ -21,12 +21,14 @@ Based on work by [Noneus](https://github.com/Noneus)
 ## Install
 
 Install via the bundled [Plugin Manager](https://github.com/foosel/OctoPrint/wiki/Plugin:-Plugin-Manager)
-or manually using this URL:
+by selecting "Install new Plugins" and in the box "...enter URL" put:
 
     https://github.com/Mrnt/OctoPrint-FlashForge/archive/master.zip
 
+then click "Install".
+
 Plugin requires the libusb1 library: https://pypi.org/project/libusb1/
-Which should install automatically if you install the plugin via the Octoprint UI.
+ which should install automatically if you install the plugin via the Octoprint UI.
 
 ## Configuration
 
