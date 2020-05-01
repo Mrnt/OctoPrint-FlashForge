@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.14 (2020-4-30)
+* Fixes for USB connection issues on newer printers such as Finder v2 (Thanks @boozecouncil)
+
 ## 0.1.13 (2020-4-16)
 * Added additional support for PowerSpec Ultra 3D (Thanks @kelkin)
 
