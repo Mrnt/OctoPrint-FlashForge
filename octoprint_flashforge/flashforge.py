@@ -21,10 +21,6 @@ class FlashForgeError(Exception):
 
 
 class FlashForge(object):
-	ENDPOINT_CMD_IN = 0x81
-	ENDPOINT_CMD_OUT = 0x01
-	ENDPOINT_DATA_IN = 0x83
-	ENDPOINT_DATA_OUT = 0x03
 	BUFFER_SIZE = 512
 
 	STATE_UNKNOWN = 0
@@ -53,6 +49,9 @@ class FlashForge(object):
 		self._printerstate = self.STATE_UNKNOWN
 
 		self._context = usb1.USBContext()
+		self._usb_endpoint_in = 0
+		self._usb_endpoint_out = 0
+
 		try:
 			self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
 		except usb1.USBError as usberror:
@@ -66,9 +65,49 @@ class FlashForge(object):
 			if self._handle:
 				try:
 					self._handle.claimInterface(0)
+					self._logger.debug("claimed USB interface")
+					device = self._handle.getDevice()
+					# look for an in and out endpoint pair:
+					for configuration in device.iterConfigurations():
+						for interface in configuration:
+							for setting in interface:
+								self._logger.debug(" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}".format(
+									setting.getNumber(), setting.getClass(), setting.getSubClass(), setting.getProtocol(), setting.getNumEndpoints()))
+								self._usb_endpoint_in = 0
+								self._usb_endpoint_out = 0
+								for endpoint in setting:
+									self._logger.debug("  found endpoint type {} at address 0x{:02x}, max packet size {}".
+										format(usb1.libusb1.libusb_transfer_type.get(endpoint.getAttributes()),
+										endpoint.getAddress(),
+										endpoint.getMaxPacketSize()))
+									if usb1.libusb1.libusb_transfer_type.get(endpoint.getAttributes()) == 'LIBUSB_TRANSFER_TYPE_BULK':
+										# use first pair of in and out endpoints we find
+										if endpoint.getAddress() & 0x80:
+											self._usb_endpoint_in = endpoint.getAddress()
+										else:
+											self._usb_endpoint_out = endpoint.getAddress()
+										if self._usb_endpoint_in and self._usb_endpoint_out:
+											self._logger.debug(
+												"  endpoint_out 0x{:02x}, endpoint_in 0x{:02x}".
+												format(self._usb_endpoint_out, self._usb_endpoint_in))
+											break
+								else:
+									continue
+								break
+							else:
+								continue
+							break
+						else:
+							continue
+						break
+					if not (self._usb_endpoint_in and self._usb_endpoint_out):
+						self.close()
+						raise FlashForgeError('Unable to find USB endpoints - turn on debug output and check octoprint.log')
 					self._plugin.on_connect(self)
+
 				except usb1.USBError as usberror:
 					raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
+
 			else:
 				self._logger.debug("No FlashForge printer found")
 				raise FlashForgeError('No FlashForge Printer found')
@@ -88,6 +127,7 @@ class FlashForge(object):
 
 	@property
 	def write_timeout(self):
+		self._logger.debug("FlashForge.write_timeout()")
 		return self._write_timeout
 
 
@@ -117,7 +157,7 @@ class FlashForge(object):
 
 		try:
 			self._logger.debug("FlashForge.write() {0}".format(data))
-			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
+			self._handle.bulkWrite(self._usb_endpoint_out, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
 			self._writelock.release()
 			return data_len
 		except usb1.USBError as usberror:
@@ -129,7 +169,7 @@ class FlashForge(object):
 		self._logger.debug("FlashForge.writeraw() called by thread {}".format(threading.currentThread().getName()))
 
 		try:
-			self._handle.bulkWrite(self.ENDPOINT_CMD_IN, data)
+			self._handle.bulkWrite(self._usb_endpoint_out, data)
 			return len(data)
 		except usb1.USBError as usberror:
 			raise FlashForgeError('USB Error writeraw()', usberror)
@@ -223,7 +263,7 @@ class FlashForge(object):
 		try:
 			# read data from USB until ok signals end or timeout
 			while not data.strip().endswith('ok'):
-				data += self._handle.bulkRead(self.ENDPOINT_CMD_OUT, self.BUFFER_SIZE, timeout).decode()
+				data += self._handle.bulkRead(self._usb_endpoint_in, self.BUFFER_SIZE, timeout).decode()
 
 		except usb1.USBError as usberror:
 			if not usberror.value == -7:  # LIBUSB_ERROR_TIMEOUT:
