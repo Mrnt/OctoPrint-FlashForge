@@ -49,8 +49,10 @@ class FlashForge(object):
 		self._printerstate = self.STATE_UNKNOWN
 
 		self._context = usb1.USBContext()
-		self._usb_endpoint_in = 0
-		self._usb_endpoint_out = 0
+		self._usb_cmd_endpoint_in = 0
+		self._usb_cmd_endpoint_out = 0
+		self._usb_sd_endpoint_in = 0
+		self._usb_sd_endpoint_out = 0
 
 		try:
 			self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
@@ -73,24 +75,30 @@ class FlashForge(object):
 							for setting in interface:
 								self._logger.debug(" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}".format(
 									setting.getNumber(), setting.getClass(), setting.getSubClass(), setting.getProtocol(), setting.getNumEndpoints()))
-								self._usb_endpoint_in = 0
-								self._usb_endpoint_out = 0
+								endpoint_in = 0
+								endpoint_out = 0
 								for endpoint in setting:
 									self._logger.debug("  found endpoint type {} at address 0x{:02x}, max packet size {}".
 										format(usb1.libusb1.libusb_transfer_type.get(endpoint.getAttributes()),
 										endpoint.getAddress(),
 										endpoint.getMaxPacketSize()))
 									if usb1.libusb1.libusb_transfer_type.get(endpoint.getAttributes()) == 'LIBUSB_TRANSFER_TYPE_BULK':
-										# use first pair of in and out endpoints we find
-										if endpoint.getAddress() & 0x80:
-											self._usb_endpoint_in = endpoint.getAddress()
+										address = endpoint.getAddress()
+										if address & usb1.libusb1.LIBUSB_ENDPOINT_IN:
+											endpoint_in = address
 										else:
-											self._usb_endpoint_out = endpoint.getAddress()
-										if self._usb_endpoint_in and self._usb_endpoint_out:
-											self._logger.debug(
-												"  endpoint_out 0x{:02x}, endpoint_in 0x{:02x}".
-												format(self._usb_endpoint_out, self._usb_endpoint_in))
-											break
+											endpoint_out = address
+										if endpoint_in and endpoint_out:
+											# we have a pair of endpoints, assign them as needed
+											# assume first pair is for commands, second for SD upload
+											if not self._usb_cmd_endpoint_out:
+												self._usb_cmd_endpoint_in = endpoint_in
+												self._usb_cmd_endpoint_out = endpoint_out
+												endpoint_in = endpoint_out = 0
+											elif not self._usb_sd_endpoint_out:
+												self._usb_sd_endpoint_in = endpoint_in
+												self._usb_sd_endpoint_out = endpoint_out
+												break
 								else:
 									continue
 								break
@@ -100,7 +108,17 @@ class FlashForge(object):
 						else:
 							continue
 						break
-					if not (self._usb_endpoint_in and self._usb_endpoint_out):
+					# if we don't have endpoints for SD upload then use the regular ones
+					if not self._usb_sd_endpoint_out:
+						self._usb_sd_endpoint_in = self._usb_cmd_endpoint_in
+						self._usb_sd_endpoint_out = self._usb_cmd_endpoint_out
+					self._logger.debug(
+						"  cmd_endpoint_out 0x{:02x}, cmd_endpoint_in 0x{:02x}".
+						format(self._usb_cmd_endpoint_out, self._usb_cmd_endpoint_in))
+					self._logger.debug(
+						"  sd_endpoint_out 0x{:02x}, sd_endpoint_in 0x{:02x}".
+						format(self._usb_sd_endpoint_out, self._usb_sd_endpoint_in))
+					if not (self._usb_cmd_endpoint_in and self._usb_cmd_endpoint_out):
 						self.close()
 						raise FlashForgeError('Unable to find USB endpoints - turn on debug output and check octoprint.log')
 					self._plugin.on_connect(self)
@@ -115,37 +133,54 @@ class FlashForge(object):
 
 	@property
 	def timeout(self):
+		"""Return timeout for reads. OctoPrint Serial Factory property"""
+
 		self._logger.debug("FlashForge.timeout()")
 		return self._read_timeout
 
 
 	@timeout.setter
 	def timeout(self, value):
+		"""Set timeout for reads. OctoPrint Serial Factory property"""
+
 		self._logger.debug("Setting read timeout to {}s".format(value))
 		self._read_timeout = value
 
 
 	@property
 	def write_timeout(self):
+		"""Return timeout for writes. OctoPrint Serial Factory property"""
+
 		self._logger.debug("FlashForge.write_timeout()")
 		return self._write_timeout
 
 
-	def is_ready(self):
-		return self._printerstate == self.STATE_READY
-
-
-	def is_printing(self):
-		return self._printerstate in self.PRINTING_STATES
-
-
 	@write_timeout.setter
 	def write_timeout(self, value):
+		"""Set timeout for writes. OctoPrint Serial Factory property"""
+
 		self._logger.debug("Setting write timeout to {}s".format(value))
 		self._write_timeout = value
 
 
+	def is_ready(self):
+		"""Return true if the printer is idle"""
+
+		return self._printerstate == self.STATE_READY
+
+
+	def is_printing(self):
+		"""Return true if the printer is in any printing state"""
+
+		return self._printerstate in self.PRINTING_STATES
+
+
 	def write(self, data):
+		"""Write commands to printer. OctoPrint Serial Factory method
+
+		Formats the commands sent by OctoPrint to make them FlashForge friendly.
+		"""
+
 		self._logger.debug("FlashForge.write() called by thread {}".format(threading.currentThread().getName()))
 
 		# save the length for return on success
@@ -157,7 +192,7 @@ class FlashForge(object):
 
 		try:
 			self._logger.debug("FlashForge.write() {0}".format(data))
-			self._handle.bulkWrite(self._usb_endpoint_out, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
+			self._handle.bulkWrite(self._usb_cmd_endpoint_out, '~{}\r\n'.format(data).encode(), int(self._write_timeout * 1000.0))
 			self._writelock.release()
 			return data_len
 		except usb1.USBError as usberror:
@@ -165,22 +200,32 @@ class FlashForge(object):
 			raise FlashForgeError('USB Error write()', usberror)
 
 
-	def writeraw(self, data):
+	def writeraw(self, data, command = True):
+		"""Write raw data to printer.
+
+		data: bytearray to send
+		command: True to send g-code, False to send to upload SD card
+		"""
+
 		self._logger.debug("FlashForge.writeraw() called by thread {}".format(threading.currentThread().getName()))
 
 		try:
-			self._handle.bulkWrite(self._usb_endpoint_out, data)
+			self._handle.bulkWrite(self._usb_cmd_endpoint_out if command else self._usb_sd_endpoint_out, data)
 			return len(data)
 		except usb1.USBError as usberror:
 			raise FlashForgeError('USB Error writeraw()', usberror)
 
 
 	def readline(self):
-		"""
-		Supports serial factory - read response from the printer as a \r\n terminated line
+		"""Read line worth of response from printer. OctoPrint Serial Factory method
+
+		Read response from the printer and store as a series of \r\n terminated lines
+		OctoPrint reads response line by line..
+
 		Returns:
 			List of lines returned from the printer
 		"""
+
 		self._logger.debug("FlashForge.readline() called by thread {}".format(threading.currentThread().getName()))
 
 		self._readlock.acquire()
@@ -191,7 +236,7 @@ class FlashForge(object):
 
 		data = self.readraw()
 
-		# translate returned data into something Octoprint understands
+		# translate returned data into something OctoPrint understands
 		if len(data):
 			if 'CMD M27 ' in data:
 				# need to filter out bogus SD print progress from cancelled or paused prints
@@ -251,6 +296,7 @@ class FlashForge(object):
 	def readraw(self, timeout=-1):
 		"""
 		Read everything available from the from the printer
+
 		Returns:
 			String containing response from the printer
 		"""
@@ -263,7 +309,7 @@ class FlashForge(object):
 		try:
 			# read data from USB until ok signals end or timeout
 			while not data.strip().endswith('ok'):
-				data += self._handle.bulkRead(self._usb_endpoint_in, self.BUFFER_SIZE, timeout).decode()
+				data += self._handle.bulkRead(self._usb_cmd_endpoint_in, self.BUFFER_SIZE, timeout).decode()
 
 		except usb1.USBError as usberror:
 			if not usberror.value == -7:  # LIBUSB_ERROR_TIMEOUT:
@@ -293,8 +339,9 @@ class FlashForge(object):
 		return False, response
 
 
-	# Obtain exclusive use of the connection for the current thread
 	def makeexclusive(self, exclusive):
+		"""	Obtain exclusive use of the connection for the current thread"""
+
 		if exclusive:
 			self._readlock.acquire()
 			self._writelock.acquire()
@@ -304,6 +351,8 @@ class FlashForge(object):
 
 
 	def close(self):
+		"""	Close USB connection and cleanup. OctoPrint Serial Factory method"""
+
 		self._logger.debug("FlashForge.close()")
 		self._incoming = None
 		self._plugin.on_disconnect()
