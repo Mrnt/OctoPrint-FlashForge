@@ -175,7 +175,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				if comm_instance.isCancelling():
 					cmd = []
 
-			# M26 is sent by OctoPrint during Sd prints:
+			# M26 is sent by OctoPrint during SD prints:
 			# M26 in Marlin = set SD card position : Flashforge = cancel
 			elif gcode == "M26":
 				# M26 S0 generated during OctoPrint cancel - use it to send cancel
@@ -252,7 +252,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 						error = "unexpected eof"
 						break
 
-					if self._serial_obj.writeraw(chunk):
+					if self._serial_obj.writeraw(chunk, False):
 						upload_percent = 100.0 * chunk_end_index / file_size
 						self.upload_percent = int(upload_percent)
 						self._logger.debug("Sent: %.2f%% %d/%d" % (self.upload_percent, chunk_end_index, file_size))
