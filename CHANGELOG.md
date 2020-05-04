@@ -1,5 +1,8 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.15 (2020-5-4)
+* Fixes for issues uploading to SD card on newer printers such as Finder v2 (Thanks @boozecouncil)
+
 ## 0.1.14 (2020-4-30)
 * Fixes for USB connection issues on newer printers such as Finder v2 (Thanks @boozecouncil)
 
