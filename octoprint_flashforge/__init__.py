@@ -143,7 +143,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def get_extension_tree(self, *args, **kwargs):
 		return dict(
 			machinecode=dict(
-				gx=["gx"]
+				gx=["gx"],			# FlashForge file with image
+				g3drem=["g3drem"]	# Dremel file with image
 			)
 		)
 
@@ -156,6 +157,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def on_disconnect(self):
 		self._logger.debug("on_disconnect()")
 		self._serial_obj = None
+
+
+	def valid_command(self, command):
+		gcode = format(command.split(" ", 1)[0])
+		return (gcode[0] in ["G", "M"]) and gcode not in ["M117"]
 
 
 	# Called when gcode commands are being placed in the queue by OctoPrint:
