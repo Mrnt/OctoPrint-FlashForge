@@ -34,6 +34,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._currentFile = None
 		self._upload_percent = 0
 		self._vendor_id = 0
+		self._vendor_name = ""
 		self._device_id = 0
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
@@ -118,6 +119,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					if device_id in self.PRINTER_IDS[vendor_name]:
 						self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
 						self._vendor_id = vendor_id
+						self._vendor_name = vendor_name
 						self._device_id = device_id
 						break
 					else:
@@ -141,10 +143,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	# Supported file extensions for SD upload
 	def get_extension_tree(self, *args, **kwargs):
+		if self._vendor_name == "Dremel":
+			return dict(
+				machinecode=dict(
+					g3drem=["g3drem"]	# Dremel file with image
+				)
+			)
 		return dict(
 			machinecode=dict(
-				gx=["gx"],			# FlashForge file with image
-				g3drem=["g3drem"]	# Dremel file with image
+				gx=["gx"]	# FlashForge file with image
 			)
 		)
 
