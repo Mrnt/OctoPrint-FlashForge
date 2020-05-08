@@ -1,5 +1,9 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.16 (2020-5-8)
+* Support .3drem files for Dremel printers
+* Fix for hanging when DisplayLayerProgress plugin is in use (Thanks @jumpingmushroom)
+
 ## 0.1.15 (2020-5-4)
 * Fixes for issues uploading to SD card on newer printers such as Finder v2 (Thanks @boozecouncil)
 
