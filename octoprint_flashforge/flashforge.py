@@ -189,6 +189,9 @@ class FlashForge(object):
 
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
+		# try to filter out garbage commands (we need to replace with something harmless)
+		if len(data) and not self._plugin.valid_command(data):
+			data = "M119"
 
 		try:
 			self._logger.debug("FlashForge.write() {0}".format(data))
