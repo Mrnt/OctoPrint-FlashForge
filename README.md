@@ -58,6 +58,9 @@ The plugin attempts to set default values for the following (so on a fresh insta
 * Under OctoPrint > Settings > Printer Profiles:
 Edit the default printer profile or create a new one to reflect the number of extruders, build volume, etc.
 
+* Under Octoprint > Settings > Features:
+    * Edit "Terminal Auto Uppercase Blacklist" to display `M146` (to allow the control of the lights inside the printer).
+
 * Under OctoPrint > Settings > Plugin Manager:
 Verify that the FlashForge plugin is enabled
 

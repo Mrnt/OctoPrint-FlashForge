@@ -203,6 +203,7 @@ class FlashForge(object):
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
 		# try to filter out garbage commands (we need to replace with something harmless)
+		# do this here instead of octoprint.comm.protocol.gcode.sending hook so DisplayLayerProgress plugin will work
 		if len(data) and not self._plugin.valid_command(data):
 			data = "M119"
 

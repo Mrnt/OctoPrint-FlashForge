@@ -48,7 +48,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			'helloCommand': "M601 S0",
 			'abortHeatupOnCancel': False
 		}
+		self._feature_settings = {
+			'autoUppercaseBlacklist': ['M146']		# LED control requires lowercase r,g,b
+		}
 		default_settings["serial"] = dict_merge(default_settings["serial"], self._conn_settings)
+		default_settings["feature"] = dict_merge(default_settings["feature"], self._feature_settings)
 
 
 	##~~ SettingsPlugin mixin
@@ -128,8 +132,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		return self._device_id != 0
 
 
-	# Main serial connection hook - create our printer connection
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
+		""" OctoPrint hook - Called when creating printer connection
+
+			Test for presence of a supported printer and then try to connect
+		"""
 		if not port == "AUTO":
 			return None
 
@@ -141,17 +148,16 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		return serial_obj
 
 
-	# Supported file extensions for SD upload
 	def get_extension_tree(self, *args, **kwargs):
-		if self._vendor_name == "Dremel":
-			return dict(
-				machinecode=dict(
-					g3drem=["g3drem"]	# Dremel file with image
-				)
-			)
+		""" OctoPrint hook - Return supported file extensions for SD upload
+
+			Note not called when printer connects, only when starting up and when the printer disconnects
+		"""
+		self._logger.debug("get_extension_tree()")
 		return dict(
 			machinecode=dict(
-				gx=["gx"]	# FlashForge file with image
+				g3drem=["g3drem"],	# Dremel
+				gx=["gx"]			# Every other FlashForge based printer
 			)
 		)
 
@@ -223,7 +229,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# M400 is sent by OctoPrint on cancel:
 			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent is triggered in OctoPrint
 			elif gcode == "M400":
-				cmd = "M119"
+				cmd = [("M119", "status_polling")]
 
 		return cmd
 
