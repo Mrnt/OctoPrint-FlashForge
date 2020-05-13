@@ -58,9 +58,22 @@ class FlashForge(object):
 			self._handle = self._context.openByVendorIDAndProductID(vendor_id, device_id)
 		except usb1.USBError as usberror:
 			if usberror.value == -3:
-				raise FlashForgeError("Unable to connect to FlashForge printer - permission error.\r\n\r\n"
-									  "On OctoPi/Linux add the following line to\r\n /etc/udev/rules.d/99-octoprint.rules:\r\n\r\n"
-									  "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{:04x}\", MODE=\"0666\"\r\n\r\nThen reboot your system for the rule to take effect.\r\n\r\n".format(vendor_id))
+				raise FlashForgeError(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\r\n\r\n"
+									  "Unable to connect to FlashForge printer - permission error.\r\n\r\n"
+									  "If you are using OctoPi/Linux add permission to access this device by editing file:\r\n /etc/udev/rules.d/99-octoprint.rules\r\n\r\n"
+									  "and adding the line:\r\n"
+									  "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{:04x}\", MODE=\"0666\"\r\n\r\n"
+									  "You can do this as follows:\r\n"
+									  "1) Connect to your OctoPi/Octoprint device using ssh\r\n"
+									  "2) Type the following to open a text editor:\r\n"
+									  "sudo nano /etc/udev/rules.d/99-octoprint.rules\r\n"
+									  "3) Add the following line:\r\n"
+  									  "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{:04x}\", MODE=\"0666\"\r\n"
+									  "4) Save the file and close the editor\r\n"
+									  "5) Verify the file permissions are set to \"rw-r--r--\" by typing:\r\n"
+									  "ls /etc/udev/rules.d/99-octoprint.rules\r\n"
+									  "6) Reboot your system for the rule to take effect.\r\n\r\n"
+									  "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\r\n\r\n".format(vendor_id, vendor_id))
 			else:
 				raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
 		else:
@@ -190,6 +203,7 @@ class FlashForge(object):
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(' \r\n')
 		# try to filter out garbage commands (we need to replace with something harmless)
+		# do this here instead of octoprint.comm.protocol.gcode.sending hook so DisplayLayerProgress plugin will work
 		if len(data) and not self._plugin.valid_command(data):
 			data = "M119"
 
