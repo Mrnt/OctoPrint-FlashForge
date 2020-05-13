@@ -1,5 +1,12 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.17 (2020-5-14)
+### New Features
+* Controls for the enclosure light added to the "Controls" tab
+### Fixes
+* Now it should actually support .3drem files for Dremel printers...
+* Support M146 command for controlling LED lights (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary#m146---control-enclosure-lights)) for docs)
+
 ## 0.1.16 (2020-5-8)
 * Support .3drem files for Dremel printers
 * Fix for hanging when DisplayLayerProgress plugin is in use (Thanks @jumpingmushroom)

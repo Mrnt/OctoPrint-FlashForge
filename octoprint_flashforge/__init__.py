@@ -59,6 +59,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def get_settings_defaults(self):
 		# put your plugin's default settings here
 		return dict(
+			ledStatus=1,
+			ledColor=[255, 255, 255]
 		)
 
 
@@ -67,6 +69,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		# Define your plugin's asset files to automatically include in the
 		# core UI here.
 		return dict(
+			js=["js/flashforge.js", "js/color-picker.js"],
+			css=["css/color-picker.css"]
 		)
 
 
