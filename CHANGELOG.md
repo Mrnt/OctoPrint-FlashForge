@@ -2,7 +2,7 @@
 
 ## 0.1.17 (2020-5-14)
 ### New Features
-* Controls for the enclosure light added to the "Controls" tab
+* Controls for the enclosure light added to the "Control" tab
 ### Fixes
 * Now it should actually support .3drem files for Dremel printers...
 * Support M146 command for controlling LED lights (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary#m146---control-enclosure-lights)) for docs)
