@@ -116,9 +116,6 @@
 .color-picker\:sv div + div + div {
   background-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0));
 }
-.color-picker\:a {
-  display: none;
-}
 .color-picker\:h,
 .color-picker\:sv {
   -webkit-touch-callout: none;
