@@ -69,8 +69,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		# Define your plugin's asset files to automatically include in the
 		# core UI here.
 		return dict(
-			js=["js/flashforge.js", "js/color-picker.js"],
-			css=["css/color-picker.css"]
+			js=["js/flashforge.js", "js/color-picker.min.js"],
+			css=["css/color-picker.min.css"]
 		)
 
 
@@ -177,8 +177,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 
 	def valid_command(self, command):
-		gcode = format(command.split(" ", 1)[0])
-		return (gcode[0] in ["G", "M"]) and gcode not in ["M117"]
+		gcode = command.split(b' ', 1)[0]
+		return (gcode[0] in b"GM") and gcode not in [b"M117"]
 
 
 	# Called when gcode commands are being placed in the queue by OctoPrint:
@@ -187,6 +187,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		if self._serial_obj:
 
 			self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
+
+			#TODO: filter M146 and other commands? when printing from SD because they cause comms to hang
 
 			# M20 list SD card, M21 init SD card - do not do if we are busy, seems to cause issues
 			if (gcode == "M20" or gcode == "M21") and not self._serial_obj.is_ready():
@@ -256,11 +258,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			error = "could not start tx"
 
 			# make sure heaters are off
-			self._serial_obj.sendcommand("M104 S0 T0")
-			self._serial_obj.sendcommand("M104 S0 T1")
-			self._serial_obj.sendcommand("M140 S0")
+			self._serial_obj.sendcommand(b"M104 S0 T0")
+			self._serial_obj.sendcommand(b"M104 S0 T1")
+			self._serial_obj.sendcommand(b"M140 S0")
 
-			ok, answer = self._serial_obj.sendcommand("M28 {} 0:/user/{}".format(file_size, remote_name), 5000)
+			ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
 			if not ok:
 				error = "file transfer not started {}".format(answer)
 			else:
@@ -270,7 +272,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			try:
 				while chunk_start_index < file_size:
 					chunk_end_index = min(chunk_start_index + self.FILE_PACKET_SIZE, file_size)
-					chunk = gcode[chunk_start_index:chunk_end_index]
+					chunk = bgcode[chunk_start_index:chunk_end_index]
 					if not chunk:
 						error = "unexpected eof"
 						break
@@ -286,10 +288,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					chunk_start_index += self.FILE_PACKET_SIZE
 
 				if not error:
-					result, response = self._serial_obj.sendcommand("M29", 10000)
-					if result and "CMD M28" in response:
+					result, response = self._serial_obj.sendcommand(b"M29", 10000)
+					if result and b"CMD M28" in response:
 						response = self._serial_obj.readraw(1000)
-					if result and "failed" not in response:
+					if result and b"failed" not in response:
 						sd_upload_succeeded(filename, remote_name, 10)
 					else:
 						error = "File transfer incomplete"
@@ -305,15 +307,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				raise flashforge.FlashForgeError(error)
 
 			self._serial_obj.makeexclusive(False)
-			# NB M23 select will also trigger a print on Flashforge
-			self._comm.selectFile("0:/user/{}\r\n".format(remote_name), True)
+			# NB M23 select will also trigger a print on FlashForge
+			self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
 			# TODO: need to set the correct file size for the progress indicator
 
 
 		import threading
 		from octoprint import util as util
 
-		gcode = ""
+		bgcode = b""
 		file_size = 0
 		"""
 		unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote file
@@ -321,9 +323,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		"""
 		remote_name = filename
 
-		file = open(path, "r")
-		gcode = file.read()
-		file_size = len(gcode)
+		file = open(path, "rb")
+		bgcode = file.read()
+		file_size = len(bgcode)
 		file.close()
 
 		self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
@@ -341,6 +343,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 # ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
 # can be overwritten via __plugin_xyz__ control properties. See the documentation for that.
 __plugin_name__ = "FlashForge Plugin"
+__plugin_pythoncompat__ = ">=2.7,<4"
+
 
 def __plugin_load__():
 	global __plugin_implementation__
