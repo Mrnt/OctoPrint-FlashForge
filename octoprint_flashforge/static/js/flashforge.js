@@ -3,7 +3,7 @@
  *
  */
 $(function () {
-    function LEDViewModel(parameters) {
+    function FlashForgeViewModel(parameters) {
         var self = this;
 
         self.controlViewModel = parameters[0];
@@ -17,7 +17,7 @@ $(function () {
 
         self.ledOff = function() {
             self.ledStatus(0);
-            self.setLed(0, 0, 0);
+            self.setLed([0, 0, 0]);
             self.saveData();
         }
 
@@ -28,11 +28,13 @@ $(function () {
         }
 
         self.pickColor = function() {
-            self.picker[self.picker.visible ? 'exit' : 'enter']();
-            self.picker.fit([self.pickerButton.offsetLeft, self.pickerButton.offsetTop + self.pickerButton.offsetHeight + 2]);
-            self.pickerButton.textContent = self.picker.visible ? 'Done' : self.pickerButton.originalText;
-            if (!self.picker.visible) {
+            if (self.pickerButton.textContent == self.pickerButton.originalText) {
+                self.picker.enter();
+                self.picker.fit([self.pickerButton.offsetLeft, self.pickerButton.offsetTop + self.pickerButton.offsetHeight + 2]);
+                self.pickerButton.textContent = 'Done';
+            } else {
                 self.setLed(self.ledColor());
+                self.pickerButton.textContent = self.pickerButton.originalText;
             }
         }
 
@@ -54,15 +56,18 @@ $(function () {
                     children: [
                         {
                             javascript: function() { self.ledOff(); },
-                            name: "Lights Off"
+                            name: "Lights Off",
+                            enabled: "self.isOperational() && !self.isPrinting();"
                         },
                         {
                             javascript: function() { self.ledOn(); },
-                            name: "Lights On"
+                            name: "Lights On",
+                            enabled: "self.isOperational() && !self.isPrinting();"
                         },
                         {
                             javascript: function() { self.pickColor(); },
                             name: "Change Color",
+                            enabled: "self.isOperational() && !self.isPrinting();",
                             additionalClasses: "ff_color_picker"
                         }
                     ]
@@ -80,15 +85,15 @@ $(function () {
             var colorinput = document.createElement("INPUT");
             colorinput.value = CP.HEX(self.ledColor());
 
-            self.picker = new CP(colorinput, false);
-            self.picker.self.classList.add('no-alpha');
+            self.picker = new CP(colorinput, true);
+            self.picker.self.getElementsByClassName('color-picker:a')[0].style.display = "none";
 
             self.pickerButton.originalText = self.pickerButton.textContent;
             self.picker.on('change', function(r, g, b) {
                 self.ledColor([r, g, b]);
                 this.source.value = this.color(r, g, b, 1);
             });
-
+            self.picker.on('exit', function() {self.pickColor();});
         }
 
         self.onEventSettingsUpdated = function() {
@@ -105,7 +110,7 @@ $(function () {
     }
 
     OCTOPRINT_VIEWMODELS.push({
-        construct: LEDViewModel,
+        construct: FlashForgeViewModel,
         dependencies: ["controlViewModel","settingsViewModel","printerStateViewModel"],
         elements: []
     });
