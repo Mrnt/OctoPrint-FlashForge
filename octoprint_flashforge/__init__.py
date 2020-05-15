@@ -18,6 +18,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		"PowerSpec": {0x0001: "Ultra 3DPrinter (C)"},
 		"Dremel": {0x8889: "Dremel IdeaBuilder 3D20"},
 		"FlashForge": {0x0001: "Dreamer", 0x000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2",
+					   0x0009: "Guider IIs",
 					   0x00e7: "Creator Max", 0x00ee: "Finder v2.12",
 					   0x00f6: "PowerSpec Ultra 3DPrinter (B)", 0x00ff: "PowerSpec Ultra 3DPrinter (A)"}}
 	FILE_PACKET_SIZE = 1024

@@ -1,6 +1,13 @@
 # OctoPrint-FlashForge Changelog
 
-## 0.1.17 (2020-5-14)
+## 0.1.18 (2020-5-15)
+### New Features
+* Allow connection to FlashForge Guider IIs (Thanks @jayceekeys)
+### Fixes
+* Support Python 3
+* Disable light controls when printing from SD
+
+## 0.1.17 (2020-5-13)
 ### New Features
 * Controls for the enclosure light added to the "Control" tab
 ### Fixes

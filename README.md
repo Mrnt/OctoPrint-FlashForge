@@ -1,7 +1,7 @@
 # OctoPrint-FlashForge
 
 Adds support to the [Octoprint](https://octoprint.org) 3D printer web interface for communication with closed source printers such as the:
-- FlashForge Finder, FlashForge Dreamer, FlashForge Dreamer NX, FlashForge Inventor, FlashForge Creator Max, FlashForge Ultra 2.0
+- FlashForge Finder, FlashForge Dreamer, FlashForge Dreamer NX, FlashForge Inventor, FlashForge Guider IIs, FlashForge Creator Max, FlashForge Ultra 2.0
 - PowerSpec Ultra 3DPrinter 2.0
 - Dremel Idea Builder 3D20
 
