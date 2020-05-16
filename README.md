@@ -5,8 +5,6 @@ Adds support to the [Octoprint](https://octoprint.org) 3D printer web interface 
 - PowerSpec Ultra 3DPrinter 2.0
 - Dremel Idea Builder 3D20
 
-Based on work by [Noneus](https://github.com/Noneus)
-
 ## Current Capabilities
 
 - Automatically detect and connect to the above printers
@@ -15,12 +13,13 @@ Based on work by [Noneus](https://github.com/Noneus)
     - Move extruder, bed
     - Turn fans on and off
     - Extrude, retract
+    - Set color of the enclosure light, turn it on/off
 - Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
 - Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
 
 ## Install
 
-Install via the bundled [Plugin Manager](https://github.com/foosel/OctoPrint/wiki/Plugin:-Plugin-Manager)
+Install via the OctoPrint [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html)
 by selecting "Install new Plugins" and in the box "...enter URL" put:
 
     https://github.com/Mrnt/OctoPrint-FlashForge/archive/master.zip
@@ -32,7 +31,7 @@ Plugin requires the libusb1 library: https://pypi.org/project/libusb1/
 
 ## Configuration
 
-Additional information can be found in the [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki), but the following steps should get you up and running on OctoPrint/OctoPi.
+The following steps should get you up and running on OctoPrint/OctoPi:
 
 ### Settings
 
@@ -68,6 +67,13 @@ Verify that the FlashForge plugin is enabled
 
 Under the main interface select "Auto" for "Serial Port".
 
+### Additional Information
+
+Additional information on g-code supported by the printers, etc can be found in the [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki).
+
+Plugin was inspired by work by [Noneus](https://github.com/Noneus) and information on these printers provided by users. If you discover an issue, figured out how to make out how to make it work better or have an idea for improvement please raise it as an [issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues).
+
+
 ## Troubleshooting
 
 * Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be restarted.
@@ -82,5 +88,15 @@ If plugin does not appear in Plugin Manager list `libusb1` may need to be instal
 * Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set [octoprint.plugins.flashforge](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/images/LoggingSettings.png) to "DEBUG" and then click the "+" sign next to it, then click "Save") to help troubleshoot connection issues.
 
 * After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log) for clues. If you cannot resolve it, create an [Issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues) in github providing the platform (Windows/OctoPi/etc), hardware (PC/Raspberry Pi 3b/etc), Printer Model, Printer Firmware Version and upload the octoprint.log as a zip file.
+
+## Support Further Development
+
+This plugin was/is developed by painstakingly reverse engineering the communication
+between FlashPrint and FlashForge printers with much trial and error. If you find it 
+useful and/or want to see continued development, please consider making a donation.
+
+[More chocolate, more code](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=S4TNWVKFLPL5C&source=url)
+
+
 
 
