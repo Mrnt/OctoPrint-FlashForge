@@ -75,6 +75,10 @@ Additional information on g-code supported by the printers, etc can be found in 
 
 Plugin was inspired by work by [Noneus](https://github.com/Noneus) and information on these printers provided by users. If you discover an issue, figured out how to make out how to make it work better or have an idea for improvement please raise it as an [issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues).
 
+## Known Issues
+
+* Currently will only print using the "Upload to SD Card" button.
+* Clicking any button in the "Control" tab after clicking a "Home" button may cause the printer to drop the connection if it has not finished "homing".
 
 ## Troubleshooting
 
