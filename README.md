@@ -17,10 +17,12 @@ Adds support to the [Octoprint](https://octoprint.org) 3D printer web interface 
 - Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
 - Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
 
+**PLEASE NOTE: At this time it will NOT print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint and trying to print, will NOT work. Hopefully this functionality will be available soon.**
+
 ## Install
 
 Install via the OctoPrint [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html)
-by selecting "Install new Plugins" and in the box "...enter URL" put:
+by clicking "Get More" and entering "FlashForge" to search the Plugin Repository, or in the box "...enter URL" put:
 
     https://github.com/Mrnt/OctoPrint-FlashForge/archive/master.zip
 
