@@ -79,6 +79,7 @@ Plugin was inspired by work by [Noneus](https://github.com/Noneus) and informati
 
 * Currently will only print using the "Upload to SD Card" button.
 * Clicking any button in the "Control" tab after clicking a "Home" button may cause the printer to drop the connection if it has not finished "homing".
+* Cannot currently connect to the printer while a print is in progress.
 
 ## Troubleshooting
 
