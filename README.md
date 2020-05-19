@@ -79,6 +79,7 @@ Plugin was inspired by work by [Noneus](https://github.com/Noneus) and informati
 
 * Currently will only print using the "Upload to SD Card" button.
 * Clicking any button in the "Control" tab after clicking a "Home" button may cause the printer to drop the connection if it has not finished "homing".
+* Cannot use any controls (besides Pause, Cancel) while a print is in progress. Temperatures, and printer status CAN be monitored because these rely on  *unbuffered* g-code commands - see [G Code Commands](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary) for a list of unbuffered commands that should work via the Terminal tab when a print is in progress.
 * Cannot currently connect to the printer while a print is in progress.
 
 ## Troubleshooting
