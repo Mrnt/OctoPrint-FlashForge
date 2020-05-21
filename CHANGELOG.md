@@ -1,5 +1,41 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.18 (2020-5-15)
+### New Features
+* Allow connection to FlashForge Guider IIs (Thanks @jayceekeys)
+### Fixes
+* Support Python 3
+* Disable light controls when printing from SD
+
+## 0.1.17 (2020-5-13)
+### New Features
+* Controls for the enclosure light added to the "Control" tab
+### Fixes
+* Now it should actually support .3drem files for Dremel printers...
+* Support M146 command for controlling LED lights (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary#m146---control-enclosure-lights)) for docs)
+
+## 0.1.16 (2020-5-8)
+* Support .3drem files for Dremel printers
+* Fix for hanging when DisplayLayerProgress plugin is in use (Thanks @jumpingmushroom)
+
+## 0.1.15 (2020-5-4)
+* Fixes for issues uploading to SD card on newer printers such as Finder v2 (Thanks @boozecouncil)
+
+## 0.1.14 (2020-4-30)
+* Fixes for USB connection issues on newer printers such as Finder v2 (Thanks @boozecouncil)
+
+## 0.1.13 (2020-4-16)
+* Added additional support for PowerSpec Ultra 3D (Thanks @kelkin)
+
+## 0.1.12 (2020-4-16)
+* Added support for FlashForge Finder v2 (Thanks @Spillmaker)
+
+## 0.1.11 (2020-4-2)
+* Added support for FlashForge Creator Max (Thanks @pfemiani)
+
+## 0.1.10 (2020-2-9)
+* Set USb buffer to a sensible size
+
 ## 0.1.9 (2020-1-15)
 * Corrected version number in setup file
 
