@@ -12,7 +12,7 @@ Adds support to the [Octoprint](https://octoprint.org) 3D printer web interface 
     - Set and monitor printer temperature
     - Move extruder, bed*
     - Turn fans on and off
-    - Extrude, retract
+    - Extrude, retract*
     - Set color of the enclosure light, turn it on/off
 - Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
 - Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
