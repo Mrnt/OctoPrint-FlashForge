@@ -194,7 +194,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
 		if self._serial_obj:
 
-			if not re.match(r'^[MG]\d+', cmd):
+			if not re.match(r'^[GMT]\d+', cmd):
 				# most likely part of the header in a .gx FlashPrint file
 				self._logger.debug("rewrite_gcode(): unrecognized command")
 				return []
@@ -277,6 +277,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# is triggered in OctoPrint
 			elif gcode == "M400":
 				cmd = [("M27", "sd_status_polling")]
+
+			# Tx = select extruder : FlashForge uses M108
+			elif gcode == "T":
+				cmd = [("M108 %s" % cmd, cmd_type)]
 
 			if cmd == []:
 				self._logger.debug("rewrite_gcode(): dropping command")
