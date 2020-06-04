@@ -48,6 +48,7 @@ class FlashForge(object):
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
 		self._temp_interval = 0
+		self._autotemp = False
 		self._incoming = queue.Queue()
 		self._readlock = threading.Lock()
 		self._writelock = threading.Lock()
@@ -182,20 +183,29 @@ class FlashForge(object):
 
 
 	def keep_alive(self):
+		"""Keep printer connection alive
+
+		Some printers drop the connection if they don't receive something at least every 4s
+		Also use for auto-reporting temperature so we can get temp when Octoprint queue is blocked by printer waiting
+		for heatup, etc
+		"""
 		exit_flag = threading.Event()
-		keep_alive = 3.0
+		status_time = 0
+		temp_time = 0
+		keep_alive = 1.0
+		self._logger.debug("keep_alive() set to:{}".format(keep_alive))
 		while not exit_flag.wait(timeout=keep_alive) and self._handle:
-			# if the printer does not receive something less than every 4 seconds (even while printing) it drops the
-			# connection...
-			if self._temp_interval:
-				# if we do the fake auto reporting of temp OctoPrint will get something during long operations to
-				# indicate the printer is still alive
+			status_time += 1
+			temp_time += 1
+			if self._temp_interval and temp_time >= self._temp_interval:
+				# do the fake auto reporting of temp OctoPrint
+				self._autotemp = True
 				self.write(b"M105")
-			self.write(b"M119")
-			if self._temp_interval > 0 and self._temp_interval < 4:
-				keep_alive = float(self._temp_interval)
-			else:
-				keep_alive = 3
+				temp_time = 0
+			if status_time == 3:
+				# get status every 3s so printer gets something during long ops
+				self.write(b"M119")
+				status_time = 0
 
 
 	def is_ready(self):
@@ -325,10 +335,11 @@ class FlashForge(object):
 				data = data.replace(b" A:", b" E0:").replace(b" B:", b" E1:")
 
 			elif b"CMD M105 " in data:
-				if self._temp_interval:
+				if self._autotemp:
 					# this was generated as an auto temp report by our keep alive so filter out the CMD and OK
 					# so as not to confuse the OctoPrint buffer counter
 					data = data.replace(b"CMD M105 Received.\r\n", b"").replace(b"\r\nok", b"")
+				self._autotemp = False
 
 			elif b"CMD M115 " in data:
 				# Try to make the firmware response more readable by OctoPrint
@@ -348,7 +359,8 @@ class FlashForge(object):
 						self._printerstate = self.STATE_SD_BUILDING
 				else:
 					self._printerstate = self.STATE_BUSY
-				data = b""
+				# remove M119 response (assuming it is the last part of the response)
+				data = data.split(b"CMD M119 ")[0]
 
 			if len(data):
 				# turn data into list of lines

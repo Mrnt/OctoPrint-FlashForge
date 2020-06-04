@@ -235,12 +235,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M84":
 				cmd = ["M18"]
 
-			# M105 get temp
-			elif gcode == "M105":
-				# if we are generating automatically in the keep alive then skip this
-				if self._serial_obj.temp_reporting():
-					cmd = []
-
 			# M106 S0 is sent by OctoPrint control panel:
 			# M106 S0 in Marlin = fan off : M107 is FlashForge equivalent
 			elif gcode == "M106":
@@ -248,8 +242,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					cmd = ["M107"]
 
 			# M108 is sent by OctoPrint during SD cancel if abortHeatupOnCancel is set:
-			# M108 in Marlin = stop heat wait & continue : FlashForge M108 Tx = change toolhead, no equivalent?
-			elif gcode == "M108":
+			# M108 in Marlin = stop heat wait & continue : FlashForge M108 Tx = change toolhead (no equivalent?),
+			# drop if this is the command
+			elif cmd == "M108":
 				cmd = []
 
 			# M109 in Marlin = wait for extruder temp : M6 in FlashForge (this may need to be moved to the write() method)
@@ -271,6 +266,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			elif gcode == "M146":
 				cmd = []
+
+			# M190 in Marlin = wait for bed temp : M7 in FlashForge
+			elif gcode == "M190":
+				cmd = [cmd.replace("M190", "M7")]
 
 			# M400 is sent by OctoPrint on cancel:
 			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent
