@@ -359,7 +359,7 @@ class FlashForge(object):
 						self._printerstate = self.STATE_SD_BUILDING
 				else:
 					self._printerstate = self.STATE_BUSY
-				# remove M119 response (assuming it is the last part of the response)
+				# remove M119 response (assuming it is the last part of the response, other command may be at the front)
 				data = data.split(b"CMD M119 ")[0]
 
 			if len(data):
