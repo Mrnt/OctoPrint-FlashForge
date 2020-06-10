@@ -271,12 +271,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M190":
 				cmd = [cmd.replace("M190", "M7")]
 
-			# M400 is sent by OctoPrint on cancel:
-			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent
-			# is triggered in OctoPrint
-			elif gcode == "M400":
-				cmd = [("M27", "sd_status_polling")]
-
 			# Tx = select extruder : FlashForge uses M108
 			elif gcode == "T":
 				cmd = [("M108 %s" % cmd, cmd_type)]
