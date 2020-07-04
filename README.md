@@ -5,6 +5,8 @@ Adds support to the [Octoprint](https://octoprint.org) 3D printer web interface 
 - PowerSpec Ultra 3DPrinter 2.0
 - Dremel Idea Builder 3D20
 
+These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on older printers such as the FlashForge Creator Pro and a few similar printers which use the GPX protocol.
+
 ## Current Capabilities
 
 - Automatically detect and connect to the above printers
