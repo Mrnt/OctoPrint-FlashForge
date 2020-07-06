@@ -1,5 +1,10 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.19 (2020-7-6)
+### New Features
+* Allow connection to FlashForge Guider II (Thanks @maesoph)
+* Allow connection to Dremel 3D45 (Thanks @garyriet)
+
 ## 0.1.18 (2020-5-15)
 ### New Features
 * Allow connection to FlashForge Guider IIs (Thanks @jayceekeys)
