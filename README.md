@@ -3,7 +3,7 @@
 Adds support to the [OctoPrint](https://octoprint.org) 3D printer web interface for communication with closed source printers such as the:
 - FlashForge Finder, FlashForge Dreamer, FlashForge Dreamer NX, FlashForge Inventor, FlashForge Creator Max, FlashForge Ultra 2.0, FlashForge Guider II
 - PowerSpec Ultra 3DPrinter 2.0
-- Dremel Idea Builder 3D20
+- Dremel Idea Builder 3D20, 3D45
 
 These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on older printers such as the FlashForge Creator Pro and a few similar printers which use the GPX protocol.
 
@@ -104,7 +104,7 @@ If plugin does not appear in Plugin Manager list `libusb1` may need to be instal
 ## Support Further Development
 
 This plugin was/is developed by painstakingly reverse engineering the communication
-between FlashPrint and FlashForge printers with much trial and error. If you find it 
+between FlashPrint and FlashForge printers with much trial and error. If you find it
 useful and/or want to see continued development, please consider making a donation.
 
 [More chocolate, more code](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=S4TNWVKFLPL5C&source=url)
