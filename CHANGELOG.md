@@ -1,5 +1,9 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.20 (2020-8-14)
+### Fix
+* Fix for not being able to connect under OctoPrint 1.4.1 (Thanks @trejan)
+
 ## 0.1.19 (2020-7-6)
 ### New Features
 * Allow connection to FlashForge Guider II (Thanks @maesoph)
