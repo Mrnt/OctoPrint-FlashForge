@@ -142,7 +142,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			Test for presence of a supported printer and then try to connect
 		"""
-		if not port == "AUTO":
+		if not port == "FlashForge_USB":
 			return None
 
 		if not self.detect_printer():
@@ -152,7 +152,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
 		return serial_obj
 
+	
+        def get_additional_port_names(self, *args, **kwargs):
+                return ["FlashForge_USB"]
 
+	
 	def get_extension_tree(self, *args, **kwargs):
 		""" OctoPrint hook - Return supported file extensions for SD upload
 
@@ -355,6 +359,7 @@ def __plugin_load__():
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.transport.serial.factory": __plugin_implementation__.printer_factory,
+		"octoprint.comm.transport.serial.additional_port_names": __plugin_implementation__.get_additional_port_names,
 		"octoprint.filemanager.extension_tree": __plugin_implementation__.get_extension_tree,
 		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.rewrite_gcode,
 		"octoprint.printer.sdcardupload": __plugin_implementation__.upload_to_sd
