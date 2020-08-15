@@ -1,5 +1,9 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.21 (2020-8-14)
+### New Feature
+* List detected printer in the OctoPrint Serial Port drop list (Thanks @trejan)
+
 ## 0.1.20 (2020-8-14)
 ### Fix
 * Fix for not being able to connect under OctoPrint 1.4.1 (Thanks @trejan)
