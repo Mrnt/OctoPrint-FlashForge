@@ -34,9 +34,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 		self._currentFile = None
 		self._upload_percent = 0
-		self._vendor_id = 0
-		self._vendor_name = ""
-		self._device_id = 0
+		self._printers = {}
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
 			'neverSendChecksum': True,
@@ -99,7 +97,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	# Look for a supported printer
 	def detect_printer(self):
-		self._device_id = 0
+		self._logger.debug("detect_printer()")
+		self._printers = {}
 		with usb1.USBContext() as usbcontext:
 			for device in usbcontext.getDeviceIterator(skip_on_error=True):
 				vendor_id = device.getVendorID()
@@ -109,32 +108,24 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				except:
 					device_name = 'unknown'
 				self._logger.debug("Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id, device_id))
-				# get USB interface details to diagnose connectivity issues
-				for configuration in device.iterConfigurations():
-					for interface in configuration:
-						for setting in interface:
-							self._logger.debug(
-								" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}, descriptor: {}".format(
-								setting.getNumber(), setting.getClass(), setting.getSubClass(),
-								setting.getProtocol(), setting.getNumEndpoints(), setting.getDescriptor()))
-							for endpoint in setting:
-								self._logger.debug(
-									"  endpoint address: 0x{:02x}, attributes: 0x{:02x}, max packet size: {}".format(
-									endpoint.getAddress(), endpoint.getAttributes(),
-									endpoint.getMaxPacketSize()))
 
 				if vendor_id in self.VENDOR_IDS:
 					vendor_name = self.VENDOR_IDS[vendor_id]
-					if device_id in self.PRINTER_IDS[vendor_name]:
-						self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
-						self._vendor_id = vendor_id
-						self._vendor_name = vendor_name
-						self._device_id = device_id
-						break
-					else:
-						raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id))
-
-		return self._device_id != 0
+					self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
+					self._printers[device_name] = {'vid': vendor_id, 'vname': vendor_name, 'did': device_id}
+					# get USB interface details to diagnose connectivity issues
+					for configuration in device.iterConfigurations():
+						for interface in configuration:
+							for setting in interface:
+								self._logger.debug(
+									" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}, descriptor: {}".format(
+									setting.getNumber(), setting.getClass(), setting.getSubClass(),
+									setting.getProtocol(), setting.getNumEndpoints(), setting.getDescriptor()))
+								for endpoint in setting:
+									self._logger.debug(
+										"  endpoint address: 0x{:02x}, attributes: 0x{:02x}, max packet size: {}".format(
+										endpoint.getAddress(), endpoint.getAttributes(),
+										endpoint.getMaxPacketSize()))
 
 
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
@@ -142,21 +133,23 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			Test for presence of a supported printer and then try to connect
 		"""
-		if not port == "FlashForge_USB":
+		if port not in self._printers:
+			# requested port not in our list
 			return None
 
-		if not self.detect_printer():
-			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
-
 		self._comm = comm
-		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
+		serial_obj = flashforge.FlashForge(self, comm, self._printers[port]['vid'], self._printers[port]['did'], read_timeout=float(read_timeout))
 		return serial_obj
 
-	
-        def get_additional_port_names(self, *args, **kwargs):
-                return ["FlashForge_USB"]
 
-	
+	def get_additional_port_names(self, *args, **kwargs):
+		""" OctoPrint hook - Called when populating Serial Port list
+		"""
+		self.detect_printer()
+		printers = self._printers.keys()
+		return printers
+
+
 	def get_extension_tree(self, *args, **kwargs):
 		""" OctoPrint hook - Return supported file extensions for SD upload
 
