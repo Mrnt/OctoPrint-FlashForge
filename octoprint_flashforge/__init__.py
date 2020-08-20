@@ -227,8 +227,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				cmd = []
 
 			# also get printer status when connecting
+			# DO NOT send M27 - Dremel 3D20 will not provide full response unless actually printing
 			elif gcode == "M115":
-				cmd = [("M119", "status_polling"), ("M27", "sd_status_polling"), (cmd, cmd_type)]
+				cmd = [("M119", "status_polling"), (cmd, cmd_type)]
 
 			# M400 is sent by OctoPrint on cancel:
 			# M400 in Marlin = wait for moves to finish : Flashforge = ? - instead send something inert so on_M400_sent is triggered in OctoPrint
