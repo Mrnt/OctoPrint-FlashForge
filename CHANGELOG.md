@@ -1,5 +1,9 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.1.22 (2020-8-20)
+### Bug Fixes
+* Do not get SD card print status M27 when connecting - Dremel 3D20 does not handle it correctly unless it is actually printing (Thanks @eduncan911)
+
 ## 0.1.21 (2020-8-14)
 ### New Feature
 * List detected printer in the OctoPrint Serial Port drop list (Thanks @trejan)
