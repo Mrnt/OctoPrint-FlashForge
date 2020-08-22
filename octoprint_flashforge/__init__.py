@@ -17,9 +17,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	VENDOR_IDS = {0x0315: "PowerSpec", 0x2a89: "Dremel", 0x2b71: "FlashForge"}
 	PRINTER_IDS = {
 		"PowerSpec": {0x0001: "Ultra 3DPrinter (C)"},
-		"Dremel": {0x8889: "Dremel IdeaBuilder 3D20"},
-		"FlashForge": {0x0001: "Dreamer", 0x000A: "Dreamer NX", 0x0002: "Finder v1", 0x0005: "Inventor", 0x0007: "Finder v2",
-					   0x0009: "Guider IIs",
+		"Dremel": {0x8889: "Dremel IdeaBuilder 3D20", 0x888d: "Dremel IdeaBuilder 3D45"},
+		"FlashForge": {0x0001: "Dreamer", 0x0002: "Finder v1",  0x0004: "Guider II", 0x0005: "Inventor",
+					   0x0007: "Finder v2", 0x0009: "Guider IIs", 0x000A: "Dreamer NX",
 					   0x00e7: "Creator Max", 0x00ee: "Finder v2.12",
 					   0x00f6: "PowerSpec Ultra 3DPrinter (B)", 0x00ff: "PowerSpec Ultra 3DPrinter (A)"}}
 	FILE_PACKET_SIZE = 1024
@@ -34,20 +34,17 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 		self._currentFile = None
 		self._upload_percent = 0
-		self._vendor_id = 0
-		self._vendor_name = ""
-		self._device_id = 0
+		self._printers = {}
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
-			'firmwareDetection': False,
-			'sdAlwaysAvailable': True,
-			'neverSendChecksum': True,
+			'firmwareDetection': False,				# do not try to auto detect firmware
+			'sdAlwaysAvailable': True,				# FF printers always(?) have the internal SD card available
+			'neverSendChecksum': True,				# FF protocol does not use command checksums
 			'timeout': {
-				'temperature': 2,
-				'temperatureTargetSet': 2,
-				'sdStatusAutoreport': 0
+				'temperature': 2,					# OP temperature polling interval when printer is idle or printing
+				'temperatureTargetSet': 2			# OP temperature polling interval when printer is idle and a temp is set
 			},
-			'helloCommand': "M601 S0",
+			'helloCommand': "M601 S0",				# FF hello command and set communication to USB
 			'abortHeatupOnCancel': False			# prevent sending of M108 command which doesn't work
 		}
 		self._feature_settings = {
@@ -100,7 +97,11 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	# Look for a supported printer
 	def detect_printer(self):
-		self._device_id = 0
+		self._logger.debug("detect_printer()")
+		if self._serial_obj:
+			return self._printers
+
+		self._printers = {}
 		with usb1.USBContext() as usbcontext:
 			for device in usbcontext.getDeviceIterator(skip_on_error=True):
 				vendor_id = device.getVendorID()
@@ -110,32 +111,24 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				except:
 					device_name = 'unknown'
 				self._logger.debug("Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id, device_id))
-				# get USB interface details to diagnose connectivity issues
-				for configuration in device.iterConfigurations():
-					for interface in configuration:
-						for setting in interface:
-							self._logger.debug(
-								" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}, descriptor: {}".format(
-								setting.getNumber(), setting.getClass(), setting.getSubClass(),
-								setting.getProtocol(), setting.getNumEndpoints(), setting.getDescriptor()))
-							for endpoint in setting:
-								self._logger.debug(
-									"  endpoint address: 0x{:02x}, attributes: 0x{:02x}, max packet size: {}".format(
-									endpoint.getAddress(), endpoint.getAttributes(),
-									endpoint.getMaxPacketSize()))
 
 				if vendor_id in self.VENDOR_IDS:
 					vendor_name = self.VENDOR_IDS[vendor_id]
-					if device_id in self.PRINTER_IDS[vendor_name]:
-						self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
-						self._vendor_id = vendor_id
-						self._vendor_name = vendor_name
-						self._device_id = device_id
-						break
-					else:
-						raise flashforge.FlashForgeError("Found an unsupported {} printer '{}' with USB ID: {:#06X}".format(vendor_name, device_name, device_id))
-
-		return self._device_id != 0
+					self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
+					self._printers[device_name] = {'vid': vendor_id, 'vname': vendor_name, 'did': device_id}
+					# get USB interface details to diagnose connectivity issues
+					for configuration in device.iterConfigurations():
+						for interface in configuration:
+							for setting in interface:
+								self._logger.debug(
+									" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}, descriptor: {}".format(
+									setting.getNumber(), setting.getClass(), setting.getSubClass(),
+									setting.getProtocol(), setting.getNumEndpoints(), setting.getDescriptor()))
+								for endpoint in setting:
+									self._logger.debug(
+										"  endpoint address: 0x{:02x}, attributes: 0x{:02x}, max packet size: {}".format(
+										endpoint.getAddress(), endpoint.getAttributes(),
+										endpoint.getMaxPacketSize()))
 
 
 	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
@@ -143,15 +136,21 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			Test for presence of a supported printer and then try to connect
 		"""
-		if not port == "AUTO":
+		if port not in self._printers:
+			# requested port not in our list
 			return None
 
-		if not self.detect_printer():
-			raise flashforge.FlashForgeError("No FlashForge printer detected - please ensure it is connected and turned on.")
-
 		self._comm = comm
-		serial_obj = flashforge.FlashForge(self, comm, self._vendor_id, self._device_id, read_timeout=float(read_timeout))
+		serial_obj = flashforge.FlashForge(self, comm, self._printers[port]['vid'], self._printers[port]['did'], read_timeout=float(read_timeout))
 		return serial_obj
+
+
+	def get_additional_port_names(self, *args, **kwargs):
+		""" OctoPrint hook - Called when populating Serial Port list
+		"""
+		self.detect_printer()
+		printers = self._printers.keys()
+		return printers
 
 
 	def get_extension_tree(self, *args, **kwargs):
@@ -182,11 +181,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def on_disconnect(self):
 		self._logger.debug("on_disconnect()")
 		self._serial_obj = None
-
-
-	def valid_command(self, command):
-		gcode = command.split(b' ', 1)[0]
-		return (gcode[0] in b"GM") and gcode not in [b"M117"]
 
 
 	# Called when gcode commands are being placed in the queue by OctoPrint:
@@ -255,10 +249,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# M110 Set line number/hello in Marlin : FlashForge uses M601 S0 to take control via USB
 			elif gcode == "M110":
 				cmd = []
-
-			# also get SD status when connecting
-			elif gcode == "M115":
-				cmd = [("M27", "sd_status_polling"), (cmd, cmd_type)]
 
 			# M119 get status we generate automatically so skip this
 			elif gcode == "M119":
@@ -392,6 +382,7 @@ def __plugin_load__():
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.transport.serial.factory": __plugin_implementation__.printer_factory,
+		"octoprint.comm.transport.serial.additional_port_names": __plugin_implementation__.get_additional_port_names,
 		"octoprint.filemanager.extension_tree": __plugin_implementation__.get_extension_tree,
 		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.rewrite_gcode,
 		"octoprint.printer.sdcardupload": __plugin_implementation__.upload_to_sd
