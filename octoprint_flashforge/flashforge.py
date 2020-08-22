@@ -1,10 +1,9 @@
 import usb1
 import threading
-import octoprint.util
+import re
 
 try:
 	import queue
-	import re
 except ImportError:
 	import Queue as queue
 
@@ -347,6 +346,13 @@ class FlashForge(object):
 							elif self._printerstate != self.STATE_UNKNOWN:
 								# after print is cancelled M27 always looks like its printing from sd card
 								data = b"CMD M27 Received.\r\nNot SD printing\r\nok\r\n"
+				elif not data.strip().endswith(b"ok"):
+					# for Dremel 3D20 not responding correctly when not printing from SD card:
+					if self._printerstate == self.STATE_READY:
+						data = b"CMD M27 Received.\r\nDone printing file\r\nok\r\n"
+					else:
+						data += b"ok\r\n"
+
 
 			elif b"CMD M114 " in data:
 				# looks like get current position returns A: and B: for extruders?

@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import absolute_import
 
+import threading
 import usb1
 import re
 import octoprint.plugin
@@ -40,10 +41,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			'firmwareDetection': False,				# do not try to auto detect firmware
 			'sdAlwaysAvailable': True,				# FF printers always(?) have the internal SD card available
 			'neverSendChecksum': True,				# FF protocol does not use command checksums
-			'timeout': {
-				'temperature': 2,					# OP temperature polling interval when printer is idle or printing
-				'temperatureTargetSet': 2			# OP temperature polling interval when printer is idle and a temp is set
-			},
 			'helloCommand': "M601 S0",				# FF hello command and set communication to USB
 			'abortHeatupOnCancel': False			# prevent sending of M108 command which doesn't work
 		}
@@ -168,8 +165,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 
 	def on_connect(self, serial_obj):
-		import threading
-
 		self._logger.debug("on_connect()")
 		self._serial_obj = serial_obj
 
@@ -341,9 +336,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# NB M23 select will also trigger a print on FlashForge
 			self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
 			# TODO: need to set the correct file size for the progress indicator
-
-
-		import threading
 
 		bgcode = b""
 		file_size = 0
