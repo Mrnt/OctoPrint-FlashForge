@@ -249,7 +249,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M119":
 				cmd = []
 
-			elif gcode == "M146":
+			# M146 = set LED colors: do not send while printing from SD (does not work, may cause issues)
+			elif gcode == "M146" and self._serial_obj.is_printing():
 				cmd = []
 
 			# M190 in Marlin = wait for bed temp : M7 in FlashForge

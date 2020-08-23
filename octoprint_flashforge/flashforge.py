@@ -35,7 +35,7 @@ class FlashForge(object):
 	STATE_HOMING = 5
 	STATE_BUSY = 6
 
-	PRINTING_STATES = (STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED, STATE_HOMING)
+	PRINTING_STATES = [STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED, STATE_HOMING]
 
 
 	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
@@ -354,16 +354,19 @@ class FlashForge(object):
 						data += b"ok\r\n"
 
 
-			elif b"CMD M114 " in data:
-				# looks like get current position returns A: and B: for extruders?
-				data = data.replace(b" A:", b" E0:").replace(b" B:", b" E1:")
-
 			elif b"CMD M105 " in data:
 				if self._autotemp:
 					# this was generated as an auto temp report by our keep alive so filter out the CMD and OK
 					# so as not to confuse the OctoPrint buffer counter
-					data = data.replace(b"CMD M105 Received.\r\n", b"").replace(b"\r\nok", b"")
+					data = data.replace(b"CMD M105 Received.\r\n", b"")
+					# do not drop the "ok" if there is the response to another command in here?
+					if not b"CMD " in data:
+						data.replace(b"\r\nok", b"")
 				self._autotemp = False
+
+			elif b"CMD M114 " in data:
+				# looks like get current position returns A: and B: for extruders?
+				data = data.replace(b" A:", b" E0:").replace(b" B:", b" E1:")
 
 			elif b"CMD M115 " in data:
 				# Try to make the firmware response more readable by OctoPrint
