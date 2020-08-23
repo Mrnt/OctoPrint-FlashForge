@@ -1,5 +1,13 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.2.0 (2020-08-22)
+### New Feature
+* Support printing directly from OctoPrint - ie should now be able to print from within OctoPrint and see progress
+using the "GCode Viewer" tab. While this feature has been tested, it has only been tested on two different printers -
+please provide feedback with debug logs if you are seeing issues.
+### Bug Fixes
+* Better support for Dremel 3D20 timeout issue when handling M27 while not printing.
+
 ## 0.1.22 (2020-8-20)
 ### Bug Fixes
 * Do not get SD card print status M27 when connecting - Dremel 3D20 does not handle it correctly unless it is actually printing (Thanks @eduncan911)

@@ -44,7 +44,7 @@ The following steps should get you up and running on OctoPrint/OctoPi:
 The plugin attempts to set default values for the following (so on a fresh install, no tweaking should be necessary):
 
 * Under OctoPrint > Settings > Serial Connection > Intervals & Timeouts:
-    * Temperature Interval (polling) 2s When printing or idle
+    * Temperature Interval (polling) 5s When printing or idle
     * Temperature Interval (polling) 2s When idle and a target temperature is set
     * Temperature Interval (autoreport) 2s Autoreport interval to request from firmware
 
@@ -55,10 +55,12 @@ The plugin attempts to set default values for the following (so on a fresh insta
     * Under "Protocol fine tuning" click "Advanced" and make sure the "Hello" command is set to `M601 S0`
 
 * Under OctoPrint > Settings > Serial Connection > Behaviour:
-    * Disable "Attempt to abort any blocking heatups on cancel via M108."
+    * Un-check "Attempt to abort any blocking heatups on cancel via M108."
 
 * Under OctoPrint > Settings > GCODE Scripts:
-    * Make sure all the script fields are empty (the default "After print job is cancelled" script generates commands that causes the printer to hang)
+    * Make sure all the script fields are empty (the default "After print job is cancelled" script generates commands
+    that causes the printer to hang). You can tweak this after you have the plugin working - use the G-code Dictionary
+    in the Wiki to help you.
 
 * Under OctoPrint > Settings > Printer Profiles:
 Edit the default printer profile or create a new one to reflect the number of extruders, build volume, etc.
