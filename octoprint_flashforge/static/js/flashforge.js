@@ -39,7 +39,8 @@ $(function () {
         }
 
         self.setLed = function(rgb) {
-            OctoPrint.control.sendGcode('M146 r'+rgb[0]+' g'+rgb[1]+' b'+rgb[2]);
+            if (!!rgb && rgb.constructor === Array && rgb.len() == 3)
+                OctoPrint.control.sendGcode('M146 r'+rgb[0]+' g'+rgb[1]+' b'+rgb[2]);
         }
 
         self.saveData = function() {

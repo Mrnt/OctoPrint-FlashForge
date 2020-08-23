@@ -1,16 +1,20 @@
 import usb1
 import threading
+import re
 
 try:
 	import queue
-	import re
 except ImportError:
 	import Queue as queue
 
 
-regex_SDPrintProgress = re.compile("(?P<current>[0-9]+)/(?P<total>[0-9]+)")
+regex_SDPrintProgress = re.compile(b"(?P<current>[0-9]+)/(?P<total>[0-9]+)")
 """
 Regex matching SD print progress from M27.
+"""
+regex_gcode = re.compile(b"^(?P<gcode>[GM][0-9]+)")
+"""
+Regex matching gcodes in write().
 """
 
 
@@ -31,22 +35,26 @@ class FlashForge(object):
 	STATE_HOMING = 5
 	STATE_BUSY = 6
 
-	PRINTING_STATES = (STATE_BUILDING, STATE_SD_BUILDING, STATE_HOMING)
+	PRINTING_STATES = (STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED, STATE_HOMING)
 
 
 	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
 		import logging
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
-		self._logger.debug("FlashForge.__init__()")
+		self._logger.debug("__init__()")
 
 		self._plugin = plugin
 		self._comm = comm
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
+		self._temp_interval = 0
+		self._M155_temp_interval = 0
+		self._autotemp = False
 		self._incoming = queue.Queue()
 		self._readlock = threading.Lock()
 		self._writelock = threading.Lock()
 		self._printerstate = self.STATE_UNKNOWN
+		self._disconnect_event = False
 
 		self._context = usb1.USBContext()
 		self._usb_cmd_endpoint_in = 0
@@ -148,7 +156,7 @@ class FlashForge(object):
 	def timeout(self):
 		"""Return timeout for reads. OctoPrint Serial Factory property"""
 
-		self._logger.debug("FlashForge.timeout()")
+		self._logger.debug("timeout()")
 		return self._read_timeout
 
 
@@ -176,15 +184,59 @@ class FlashForge(object):
 		self._write_timeout = value
 
 
+	def _valid_command(self, command):
+		""" Check if command is valid for FF
+
+		"""
+		gcode = command.split(b' ', 1)[0]
+		return (gcode[0] in b"GM") and gcode not in [b"M117"]
+
+
+	def keep_alive(self):
+		"""Keep printer connection alive
+
+		Some printers drop the connection if they don't receive something at least every 4s, so we will send M119 to
+		get status every few seconds.
+		Also use for auto-reporting temperature so we can pass temp to Octoprint when the print queue is blocked by
+		printer waiting for heatup, etc otherwise OctoPrint will think the printer is not responding...
+		"""
+		exit_flag = threading.Event()
+		temp_time = 0.0
+		status_time = 0.0
+		keep_alive = 0.5
+		self._logger.debug("keep_alive() set to:{}".format(keep_alive))
+		while self._handle and not self._disconnect_event and not exit_flag.wait(timeout=keep_alive):
+			# do not queue commands if the connection is going away
+			temp_time += keep_alive
+			if self._temp_interval and temp_time >= self._temp_interval:
+				# do the fake auto reporting of temp OctoPrint
+				self._autotemp = True
+				self.write(b"M105")
+				temp_time = 0.0
+			status_time += keep_alive
+			if status_time >= 3.5:
+				# get status every 3s so printer gets something during long ops
+				self.write(b"M119")
+				status_time = 0.0
+
+
+	def on_disconnect_event(self):
+		"""Called to signal we are disconnecting"""
+
+		self._disconnect_event = True
+
+
 	def is_ready(self):
 		"""Return true if the printer is idle"""
 
+		self._logger.debug("is_ready()")
 		return self._printerstate == self.STATE_READY
 
 
 	def is_printing(self):
 		"""Return true if the printer is in any printing state"""
 
+		self._logger.debug("is_printing()")
 		return self._printerstate in self.PRINTING_STATES
 
 
@@ -195,20 +247,37 @@ class FlashForge(object):
 		"""
 
 		self._logger.debug("FlashForge.write() called by thread {}".format(threading.currentThread().getName()))
+		if not self._handle:
+			# do not queue commands if the connection is going away
+			return
 
 		# save the length for return on success
 		data_len = len(data)
+
+		match = regex_gcode.search(data)
+		if match:
+			try:
+				gcode = match.group("gcode")
+			except:
+				pass
+			else:
+				if gcode == b"M155":
+					# we don't support M155 but have to handle it here instead rewrite() so that OctoPrint thinks it sent it
+					self._M155_temp_interval = int(re.search("S([0-9]+)", data.decode()).group(1))
+					data = b"M155 S0"
+
 		self._writelock.acquire()
 
 		# strip carriage return, etc so we can terminate lines the FlashForge way
 		data = data.strip(b" \r\n")
 		# try to filter out garbage commands (we need to replace with something harmless)
 		# do this here instead of octoprint.comm.protocol.gcode.sending hook so DisplayLayerProgress plugin will work
-		if len(data) and not self._plugin.valid_command(data):
-			data = b"M119"
+		if len(data) and not self._valid_command(data):
+			self._logger.debug("filtering command {0}".format(data.decode()))
+			data = b"G4 S0"
 
 		try:
-			self._logger.debug("FlashForge.write() {0}".format(data.decode()))
+			self._logger.debug("write() {0}".format(data.decode()))
 			self._handle.bulkWrite(self._usb_cmd_endpoint_out, b"~%s\r\n" % data, int(self._write_timeout * 1000.0))
 			self._writelock.release()
 			return data_len
@@ -224,7 +293,7 @@ class FlashForge(object):
 		command: True to send g-code, False to send to upload SD card
 		"""
 
-		self._logger.debug("FlashForge.writeraw() called by thread {}".format(threading.currentThread().getName()))
+		self._logger.debug("writeraw() called by thread {}".format(threading.currentThread().getName()))
 
 		try:
 			self._handle.bulkWrite(self._usb_cmd_endpoint_out if command else self._usb_sd_endpoint_out, data)
@@ -243,7 +312,7 @@ class FlashForge(object):
 			List of lines returned from the printer
 		"""
 
-		self._logger.debug("FlashForge.readline() called by thread {}".format(threading.currentThread().getName()))
+		self._logger.debug("readline() called by thread {}".format(threading.currentThread().getName()))
 
 		self._readlock.acquire()
 
@@ -252,13 +321,15 @@ class FlashForge(object):
 			return self._incoming.get_nowait()
 
 		data = self.readraw()
+		if not data.strip().endswith(b"ok") and len(data):
+			data += self.readraw()
 
 		# translate returned data into something OctoPrint understands
 		if len(data):
 			if b"CMD M27 " in data:
 				# need to filter out bogus SD print progress from cancelled or paused prints
-				if b"printing byte" in data and self._printerstate in [self.STATE_READY, self.STATE_SD_PAUSED]:
-					match = regex_SDPrintProgress.search(data.decode())
+				if b"printing byte" in data and self._printerstate in [self.STATE_UNKNOWN, self.STATE_READY, self.STATE_SD_PAUSED]:
+					match = regex_SDPrintProgress.search(data)
 					if match:
 						try:
 							current = int(match.group("current"))
@@ -272,16 +343,39 @@ class FlashForge(object):
 							elif self._printerstate == self.STATE_SD_PAUSED:
 								# when paused still indicates printing
 								data = b"CMD M27 Received.\r\nPrinting paused\r\nok\r\n"
-							else:
+							elif self._printerstate != self.STATE_UNKNOWN:
 								# after print is cancelled M27 always looks like its printing from sd card
 								data = b"CMD M27 Received.\r\nNot SD printing\r\nok\r\n"
+				elif not data.strip().endswith(b"ok"):
+					# for Dremel 3D20 not responding correctly when not printing from SD card:
+					if self._printerstate == self.STATE_READY:
+						data = b"CMD M27 Received.\r\nDone printing file\r\nok\r\n"
+					else:
+						data += b"ok\r\n"
+
 
 			elif b"CMD M114 " in data:
 				# looks like get current position returns A: and B: for extruders?
 				data = data.replace(b" A:", b" E0:").replace(b" B:", b" E1:")
 
+			elif b"CMD M105 " in data:
+				if self._autotemp:
+					# this was generated as an auto temp report by our keep alive so filter out the CMD and OK
+					# so as not to confuse the OctoPrint buffer counter
+					data = data.replace(b"CMD M105 Received.\r\n", b"").replace(b"\r\nok", b"")
+				self._autotemp = False
+
+			elif b"CMD M115 " in data:
+				# Try to make the firmware response more readable by OctoPrint
+				# Fake autotemp reporting capability - we can do it as part of the keep alive. Means we will still get
+				# temp updates while OctoPrint is waiting for blocking commands to be processed in the queue
+				data = data.replace(b"Firmware:", b"FIRMWARE_NAME: FlashForge VER:").\
+					replace(b"\r\nok", b"\r\nCap:AUTOREPORT_TEMP:1\r\nok")
+
 			elif b"CMD M119 " in data:
-				if b"MachineStatus: READY" in data:
+				# this was generated by us so do not return anything to OctoPrint
+				oldstate = self._printerstate
+				if b"MachineStatus: READY" in data and b"MoveMode: READY" in data:
 					self._printerstate = self.STATE_READY
 				elif b"MachineStatus: BUILDING_FROM_SD" in data:
 					if b"MoveMode: PAUSED" in data:
@@ -290,22 +384,40 @@ class FlashForge(object):
 						self._printerstate = self.STATE_SD_BUILDING
 				else:
 					self._printerstate = self.STATE_BUSY
+				# Remove M119 response (assuming it is the last part of the response, other command may be at the front)
+				# Typically if something is prepended, it will be a move related command.
+				data = data.split(b"CMD M119 ")[0]
+				if len(data) and (self._printerstate == self.STATE_READY or self._printerstate == self.STATE_SD_PAUSED):
+					# If the printer is still moving it will send the ok associated with the command later. If it has
+					# completed the movement a separate ok is never sent so we add it here
+					data += b"ok\r\n"
 
+				if oldstate != self._printerstate:
+					self._logger.debug("state changed from {} to {}".format(oldstate, self._printerstate))
+					# force temp reporting if busy so OctoPrint sees something
+					if self._M155_temp_interval:
+						self._temp_interval = self._M155_temp_interval
+					else:
+						self._temp_interval = 0 if self._printerstate == self.STATE_READY else 3
 
-			# turn data into list of lines
-			datalines = data.splitlines()
-			for i, line in enumerate(datalines):
-				self._incoming.put(line)
+			if len(data):
+				# turn data into list of lines
+				datalines = data.splitlines()
+				for i, line in enumerate(datalines):
+					self._incoming.put(line)
 
-				# if M20 (list SD card files) does not return anything, make it look like an empty file list
-				if b"CMD M20 " in line and datalines[i+1] and datalines[i+1] == b"ok":
-					# fetch SD card list does not get anything so fake out a result
-					self._incoming.put("Begin file list")
-					self._incoming.put("End file list")
+					# if M20 (list SD card files) does not return anything, make it look like an empty file list
+					if b"CMD M20 " in line and datalines[i+1] and datalines[i+1] == b"ok":
+						# fetch SD card list does not get anything so fake out a result
+						self._incoming.put(b"Begin file list")
+						self._incoming.put(b"End file list")
+			else:
+				self._incoming.put(data)
 
 		else:
 			self._incoming.put(data)
 
+		self._logger.debug("readline() returning {}".format(data.decode().replace('\r\n', ' | ')))
 		self._readlock.release()
 		return self._incoming.get_nowait()
 
@@ -318,10 +430,10 @@ class FlashForge(object):
 			String containing response from the printer
 		"""
 
-		data = b''
+		data = b""
 		if timeout == -1:
 			timeout = int(self._read_timeout * 1000.0)
-		self._logger.debug("FlashForge.readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
+		self._logger.debug("readraw() called by thread: {}, timeout: {}".format(threading.currentThread().getName(), timeout))
 
 		try:
 			# read data from USB until ok signals end or timeout
@@ -332,14 +444,14 @@ class FlashForge(object):
 			if not usberror.value == -7:  # LIBUSB_ERROR_TIMEOUT:
 				raise FlashForgeError("USB Error readraw()", usberror)
 			else:
-				self._logger.debug("FlashForge.readraw() error: {}".format(usberror))
+				self._logger.debug("readraw() error: {}".format(usberror))
 
-		self._logger.debug("FlashForge.readraw() {}".format(data.decode().replace("\r\n", " | ")))
+		self._logger.debug("readraw() {}".format(data.decode().replace("\r\n", " | ")))
 		return data
 
 
 	def sendcommand(self, cmd, timeout=-1, readresponse=True):
-		self._logger.debug("FlashForge.sendcommand() {}".format(cmd.decode()))
+		self._logger.debug("sendcommand() {}".format(cmd.decode()))
 
 		self.writeraw(b"~%s\r\n" % cmd)
 		if not readresponse:
@@ -351,7 +463,7 @@ class FlashForge(object):
 		while response and gcode not in response:
 			response = self.readraw(timeout)
 		if b"ok\r\n" in response:
-			self._logger.debug("FlashForge.sendcommand() got an ok")
+			self._logger.debug("sendcommand() got an ok")
 			return True, response
 		return False, response
 
@@ -370,7 +482,7 @@ class FlashForge(object):
 	def close(self):
 		"""	Close USB connection and cleanup. OctoPrint Serial Factory method"""
 
-		self._logger.debug("FlashForge.close()")
+		self._logger.debug("close()")
 		self._incoming = None
 		self._plugin.on_disconnect()
 		if self._handle:
