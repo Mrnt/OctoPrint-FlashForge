@@ -16,6 +16,14 @@ regex_gcode = re.compile(b"^(?P<gcode>[GM][0-9]+)")
 """
 Regex matching gcodes in write().
 """
+regex_g1 = re.compile(b"G1(?=.* X(?P<X>-?[\d.]+))?(?=.* Y(?P<Y>-?[\d.]+))?(?=.* Z(?P<Z>-?[\d.]+))?(?=.* E(?P<E>-?[\d.]+))?(?=.* F(?P<F>[\d.]+))?")
+"""
+Regex matching move G1 commands for noG91 handling.
+"""
+regex_M114position = re.compile(b"X:(?P<X>-?[\d.]+) Y:(?P<Y>-?[\d.]+) Z:(?P<Z>-?[\d.]+) E0:(?P<E0>-?[\d.]+)( E1:(?P<E1>-?[\d.]+))?")
+"""
+Regex matching position values from M114
+"""
 
 
 class FlashForgeError(Exception):
@@ -55,6 +63,11 @@ class FlashForge(object):
 		self._writelock = threading.Lock()
 		self._printerstate = self.STATE_UNKNOWN
 		self._disconnect_event = False
+
+		self._noG91 = False
+		self._relative_pos = False
+		self._pos = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E0": 0.0, "E1": 0.0}
+		self._extruder = "E0"
 
 		self._context = usb1.USBContext()
 		self._usb_cmd_endpoint_in = 0
@@ -240,6 +253,10 @@ class FlashForge(object):
 		return self._printerstate in self.PRINTING_STATES
 
 
+	def disable_G91(self, disable):
+		self._noG91 = disable
+
+
 	def write(self, data):
 		"""Write commands to printer. OctoPrint Serial Factory method
 
@@ -275,6 +292,40 @@ class FlashForge(object):
 		if len(data) and not self._valid_command(data):
 			self._logger.debug("filtering command {0}".format(data.decode()))
 			data = b"G4 S0"
+		else:
+			# special handling for relative positioning support
+			cmd = data.split(b' ', 1)
+			payload = b"" if len(cmd) == 1 else cmd[1]
+			gcode = cmd[0]
+
+			if gcode == b"G1" and self._noG91 and self._relative_pos:
+				# try to convert relative positioning to absolute
+				self._logger.debug("G1 with rel pos")
+				match = regex_g1.search(data)
+				if match:
+					self._logger.debug("G1 {0}".format(match.groupdict()))
+					data = b"G1"
+					for k, v in match.groupdict().items():
+						if v != None:
+							if k in ['X', 'Y', 'Z']:
+								v = self._pos[k] + float(v)
+								data += b" %s%06.4f" % (k.encode(), v)
+							elif k == 'E':
+								self._logger.debug("extruder {}, {}".format(self._extruder, self._pos[self._extruder]))
+								v = self._pos[self._extruder] + float(v)
+								data += b" %s%06.4f" % (k.encode(), v)
+							else:
+								v = int(v)
+								data += b" %s%d" % (k.encode(), v)
+			elif gcode == b"G90":
+				self._relative_pos = False
+			elif gcode == b"G91":
+				self._relative_pos = True
+				if self._noG91:
+					data = b"G90"
+			elif gcode == b"M108":
+				self._extruder = "E1" if b"T1" in payload else "E0"
+				self._logger.debug("select extruder {0}".format(self._extruder))
 
 		try:
 			self._logger.debug("write() {0}".format(data.decode()))
@@ -360,13 +411,19 @@ class FlashForge(object):
 					# so as not to confuse the OctoPrint buffer counter
 					data = data.replace(b"CMD M105 Received.\r\n", b"")
 					# do not drop the "ok" if there is the response to another command in here?
-					if not b"CMD " in data:
-						data.replace(b"\r\nok", b"")
+					if b"CMD " not in data:
+						data = data.replace(b"\r\nok", b"")
 				self._autotemp = False
 
 			elif b"CMD M114 " in data:
 				# looks like get current position returns A: and B: for extruders?
 				data = data.replace(b" A:", b" E0:").replace(b" B:", b" E1:")
+				match = regex_M114position.search(data)
+				if match:
+					for k, v in match.groupdict().items():
+						if v != None:
+							self._pos[k] = float(v)
+					self._logger.debug("pos: {}".format(self._pos))
 
 			elif b"CMD M115 " in data:
 				# Try to make the firmware response more readable by OctoPrint
@@ -420,7 +477,7 @@ class FlashForge(object):
 		else:
 			self._incoming.put(data)
 
-		self._logger.debug("readline() returning {}".format(data.decode().replace('\r\n', ' | ')))
+		self._logger.debug("readline() returning: {}".format(data.decode().replace('\r\n', ' | ')))
 		self._readlock.release()
 		return self._incoming.get_nowait()
 

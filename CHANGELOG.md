@@ -1,5 +1,12 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.2.1 (2020-08-23)
+### Bug Fixes
+* LED control now working.
+* Support for X, Y, Z and extruder movement under the "Control" tab for printers such as Finder II, Guider II which
+do not support relative positioning. There is a setting under "Settings" > "Printer Profiles" > "Axes" where you can
+select G91 not supported.
+
 ## 0.2.0 (2020-08-22)
 ### New Feature
 * Support printing directly from OctoPrint - ie should now be able to print from within OctoPrint and see progress
