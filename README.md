@@ -21,7 +21,8 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
 - Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. **Note: this is a new feature and there may be issues with reliability - please tread carefully and provide detailed bug reports.**
 - Print directly from Cura via OctoPrint (see warning on previous item).
 
-* May be issues with FlashForge Finder II, Guider II, Guider IIs - please report with debug log files (see below for how to enable debugging).
+
+\* May be issues with FlashForge Finder II, Guider II, Guider IIs - please report with debug log files (see below for how to enable debugging).
 
 
 ## Install
