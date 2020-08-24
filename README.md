@@ -18,7 +18,7 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
     - Set color of the enclosure light, turn it on/off
 - Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
 - Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
-- Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. ** Note: this is a new feature and there may be issues with reliability - please tread carefully and provide detailed bug reports.**
+- Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. **Note: this is a new feature and there may be issues with reliability - please tread carefully and provide detailed bug reports.**
 - Print directly from Cura via OctoPrint (see warning on previous item).
 
 * May be issues with FlashForge Finder II, Guider II, Guider IIs - please report with debug log files (see below for how to enable debugging).
