@@ -9,6 +9,13 @@ from octoprint.settings import default_settings
 from octoprint.util import dict_merge
 from . import flashforge
 
+'''
+Special case support:
+
+G91 (relative positioning) appears not to be supported by Finder 2, Guider 2 (F2G2). Made into printer profile option
+(ff.noG91) so users can enable as appropriate. Flag is also used to special case other F2G2 issues such as:
+- F2G2 does not appear to support "G28 X Y"
+'''
 
 class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.AssetPlugin,
@@ -53,7 +60,14 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	##~~ SettingsPlugin mixin
 	def get_settings_defaults(self):
-		# put your plugin's default settings here
+		# add default value ff.noG91 to printer profiles or the setting won't get saved by OctoPrint
+		profiles = self._printer_profile_manager.get_all()
+		self._printer_profile_manager.default["ff"] = dict(noG91=False)
+		for k, profile in profiles.items():
+			profile = dict_merge(self._printer_profile_manager.default, profile)
+			self._printer_profile_manager.save(profile, True)
+
+		# plugin default settings here
 		return dict(
 			ledStatus=1,
 			ledColor=[255, 255, 255]
@@ -178,6 +192,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 
 
+	# Flag F2G2
+	def G91_disabled(self):
+		profile = self._printer_profile_manager.get_current_or_default()
+		return "ff" in profile and "noG91" in profile["ff"] and profile["ff"]["noG91"]
+
+
 	# Called when gcode commands are being placed in the queue by OctoPrint:
 	# Mostly important for control panel or translating and printing non FlashPrint file directly from OctoPrint
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
@@ -192,8 +212,25 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			#TODO: filter M146 and other commands? when printing from SD because they cause comms to hang
 
+			# homing
+			if gcode == "G28":
+				cmd = cmd.replace('0', '')
+				if self.G91_disabled() and cmd == "G28 X Y":
+					# F2G2: does not support "G28 X Y"?
+					# F2 needs first G28 to finish or it will ignore the second one
+					cmd = ["G28 X", "M400", "G28 Y"]
+
+			# relative positioning
+			elif gcode == "G91":
+				if self.G91_disabled():
+					# F2G2: try to convert relative positioning to absolute so add in some commands
+					self._serial_obj.disable_G91(True)
+					cmd = [("G91", cmd_type), "M114"]
+				else:
+					self._serial_obj.disable_G91(False)
+
 			# M20 list SD card, M21 init SD card - do not do if we are busy, seems to cause issues
-			if (gcode == "M20" or gcode == "M21") and not self._serial_obj.is_ready():
+			elif (gcode == "M20" or gcode == "M21") and not self._serial_obj.is_ready():
 				cmd = []
 
 			# M25 = pause
@@ -249,7 +286,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M119":
 				cmd = []
 
-			elif gcode == "M146":
+			# M146 = set LED colors: do not send while printing from SD (does not work, may cause issues)
+			elif gcode == "M146" and self._serial_obj.is_printing():
 				cmd = []
 
 			# M190 in Marlin = wait for bed temp : M7 in FlashForge

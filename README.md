@@ -103,6 +103,9 @@ If plugin does not appear in Plugin Manager list `libusb1` may need to be instal
 
 * After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log) for clues. If you cannot resolve it, create an [Issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues) in github providing the platform (Windows/OctoPi/etc), hardware (PC/Raspberry Pi 3b/etc), Printer Model, Printer Firmware Version and upload the octoprint.log as a zip file.
 
+* If you have a printer such as Finder II, Guider II and find that the movement controls under the "Control" tab do not seem to work,
+there is a setting under "Settings" > "Printer Profiles" > "Axes" where you can select G91 (relative positioning) not supported.
+
 ## Support Further Development
 
 This plugin was/is developed by painstakingly reverse engineering the communication
