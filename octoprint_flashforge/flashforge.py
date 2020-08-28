@@ -16,11 +16,11 @@ regex_gcode = re.compile(b"^(?P<gcode>[GM][0-9]+)")
 """
 Regex matching gcodes in write().
 """
-regex_g1 = re.compile(b"G1(?=.* X(?P<X>-?[\d.]+))?(?=.* Y(?P<Y>-?[\d.]+))?(?=.* Z(?P<Z>-?[\d.]+))?(?=.* E(?P<E>-?[\d.]+))?(?=.* F(?P<F>[\d.]+))?")
+regex_g1 = re.compile(b"G1(?=.* X(?P<X>-?[0-9.]+))?(?=.* Y(?P<Y>-?[0-9.]+))?(?=.* Z(?P<Z>-?[0-9.]+))?(?=.* E(?P<E>-?[0-9.]+))?(?=.* F(?P<F>[0-9.]+))?")
 """
 Regex matching move G1 commands for noG91 handling.
 """
-regex_M114position = re.compile(b"X:(?P<X>-?[\d.]+) Y:(?P<Y>-?[\d.]+) Z:(?P<Z>-?[\d.]+) E0:(?P<E0>-?[\d.]+)( E1:(?P<E1>-?[\d.]+))?")
+regex_M114position = re.compile(b"X:(?P<X>-?[0-9.]+) Y:(?P<Y>-?[0-9.]+) Z:(?P<Z>-?[0-9.]+) E0:(?P<E0>-?[0-9.]+)( E1:(?P<E1>-?[0-9.]+))?")
 """
 Regex matching position values from M114
 """
@@ -218,8 +218,8 @@ class FlashForge(object):
 		status_time = 0.0
 		keep_alive = 0.5
 		self._logger.debug("keep_alive() set to:{}".format(keep_alive))
-		while self._handle and not self._disconnect_event and not exit_flag.wait(timeout=keep_alive):
-			# do not queue commands if the connection is going away
+		# do not queue commands if the connection is going away
+		while self._handle and not self._disconnect_event:
 			temp_time += keep_alive
 			if self._temp_interval and temp_time >= self._temp_interval:
 				# do the fake auto reporting of temp OctoPrint
@@ -227,11 +227,14 @@ class FlashForge(object):
 				self.write(b"M105")
 				temp_time = 0.0
 			status_time += keep_alive
-			if status_time >= 3.5:
-				# get status every 3s so printer gets something during long ops
+			if status_time >= 2.0:
+				# get status every 2s so printer gets something during long ops
+				# Dremel 3D20 seems to require something at least every 2s - other FF printers seem to be able to wait up to 3.5s
+				# may want to make this a setting
 				self.write(b"M119")
 				status_time = 0.0
-
+			if exit_flag.wait(timeout=keep_alive):
+				exit()
 
 	def on_disconnect_event(self):
 		"""Called to signal we are disconnecting"""
@@ -251,6 +254,13 @@ class FlashForge(object):
 
 		self._logger.debug("is_printing()")
 		return self._printerstate in self.PRINTING_STATES
+
+
+	def is_sd_printing(self):
+		"""Return true if the printer is in any printing state"""
+
+		self._logger.debug("is_sd_printing()")
+		return self._printerstate in [self.STATE_SD_PAUSED, self.STATE_SD_BUILDING]
 
 
 	def disable_G91(self, disable):
@@ -281,6 +291,7 @@ class FlashForge(object):
 				if gcode == b"M155":
 					# we don't support M155 but have to handle it here instead rewrite() so that OctoPrint thinks it sent it
 					self._M155_temp_interval = int(re.search("S([0-9]+)", data.decode()).group(1))
+					self._temp_interval = self._M155_temp_interval
 					data = b"M155 S0"
 
 		self._writelock.acquire()
@@ -372,8 +383,8 @@ class FlashForge(object):
 			return self._incoming.get_nowait()
 
 		data = self.readraw()
-		if not data.strip().endswith(b"ok") and len(data):
-			data += self.readraw()
+		#if not data.strip().endswith(b"ok") and len(data):
+		#	data += self.readraw()
 
 		# translate returned data into something OctoPrint understands
 		if len(data):
@@ -404,14 +415,15 @@ class FlashForge(object):
 					else:
 						data += b"ok\r\n"
 
-
 			elif b"CMD M105 " in data:
 				if self._autotemp:
 					# this was generated as an auto temp report by our keep alive so filter out the CMD and OK
 					# so as not to confuse the OctoPrint buffer counter
 					data = data.replace(b"CMD M105 Received.\r\n", b"")
-					# do not drop the "ok" if there is the response to another command in here?
-					if b"CMD " not in data:
+					# TODO: add " W:?" to the string to indicate that the printer is waiting to get to temp if state
+					#  indicates waiting on tool or bed. This should prevent OctoPrint from triggering timeouts?
+					if not (b"CMD " in data and self._printerstate in [self.STATE_SD_BUILDING, self.STATE_SD_PAUSED]):
+						# do not drop the "ok" if there is the response to another command in here and we are printing from SD?
 						data = data.replace(b"\r\nok", b"")
 				self._autotemp = False
 
