@@ -22,7 +22,7 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
 - Print directly from Cura via OctoPrint to SD card or direct (see warning on previous item).
 
 
-\* May be issues with FlashForge Finder II, Guider II, Guider IIs - please report with debug log files (see below for how to enable debugging).
+\* May be issues with FlashForge Finder II, Guider II, Guider IIs - these printers do not support relative positioning so when you create your Printer Profile in OctoPrint you will need to go to the "Axes" tab and select "G91 Not Supported". If you still experience issues when using the controls please report with debug log files (see below for how to enable debugging).
 
 
 ## Install
