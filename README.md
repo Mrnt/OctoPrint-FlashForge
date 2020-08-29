@@ -18,8 +18,8 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
     - Set color of the enclosure light, turn it on/off
 - Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
 - Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
-- Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. **Note: this is a new feature and there may be issues with reliability or even whether it will work at all - please tread carefully and provide detailed bug reports.**
-- Print directly from Cura via OctoPrint (see warning on previous item).
+- Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. **Note: this is a new feature and there may be issues with reliability or even whether it will work at all on a given printer (it has only been tested on a PowerSpec Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bug reports.**
+- Print directly from Cura via OctoPrint to SD card or direct (see warning on previous item).
 
 
 \* May be issues with FlashForge Finder II, Guider II, Guider IIs - please report with debug log files (see below for how to enable debugging).
@@ -85,7 +85,7 @@ Plugin was inspired by work by [Noneus](https://github.com/Noneus) and informati
 
 ## Known Issues
 
-* Currently will only print using the "Upload to SD Card" button.
+* Currently will only reliably print using the "Upload to SD Card" button. As described above, the print from OctoPrint functionality is in place but is currently only tested (and somewhat reliable) on PowerSpec Ultra 3D, FlashForge Finder v1.
 * Clicking any button in the "Control" tab after clicking a "Home" button may cause the printer to drop the connection if it has not finished "homing".
 * Cannot use any controls (besides Pause, Cancel) while a print is in progress. Temperatures, and printer status CAN be monitored because these rely on  *unbuffered* g-code commands - see [G Code Commands](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary) for a list of unbuffered commands that should work via the Terminal tab when a print is in progress.
 * Cannot currently connect to the printer while a print is in progress.
