@@ -34,8 +34,8 @@ Shows current state of printer compatability for core OctoPrint functionality an
 |Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
 |Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
 |Creator Max		|Yes					|?									|?								|      
-|Creator Pro		|No						|No									|No								|      
-|Creator Pro 2		|No						|No									|No								|      
+|Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|      
+|Creator Pro 2		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
 |Dreamer			|Yes					|?									|?								|      
 |Dreamer NX			|Yes					|?									|?								|      
 |Finder v1			|Yes					|Yes								|Yes							|      
