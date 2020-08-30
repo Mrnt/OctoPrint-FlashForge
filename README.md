@@ -25,8 +25,8 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
 - Print directly from Cura via OctoPrint to SD card or direct (see warning on previous item).
 
 
-### Printer Compatability
-Shows current state of printer compatability for core OctoPrint functionality and will be updated as users provide feedback.
+### Printer Compatibility
+Shows current state of printer Compatibility for core OctoPrint functionality and will be updated as users provide feedback.
 |Printer			|Upload File to SD Card |Control Movement and Temperature	|Print Directly From OctoPrint	|
 |---				|---					|---								|---							|      
 |Adventurer 3		|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
