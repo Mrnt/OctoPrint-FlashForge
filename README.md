@@ -5,6 +5,9 @@ Adds support to the [OctoPrint](https://octoprint.org) 3D printer web interface 
 - PowerSpec Ultra 3DPrinter 2.0
 - Dremel Idea Builder 3D20, 3D45
 
+At the current time, plugin will only work with printers that support a connection to a host computer (eg RaspberryPi) via USB.
+
+
 These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on older printers such as the FlashForge Creator Pro and a few similar printers which use the GPX protocol.
 
 ## Current Capabilities
@@ -21,6 +24,32 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
 - Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. **Note: this is a new feature and there may be issues with reliability or even whether it will work at all on a given printer (it has only been tested on a PowerSpec Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bug reports.**
 - Print directly from Cura via OctoPrint to SD card or direct (see warning on previous item).
 
+
+### Printer Compatability
+Shows current state of printer compatability for core OctoPrint functionality and will be updated as users provide feedback.
+|Printer			|Upload File to SD Card |Control Movement and Temperature	|Print Directly From OctoPrint	|
+|---				|---					|---								|---							|      
+|Adventurer 3		|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
+|Adventurer 3C		|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
+|Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
+|Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
+|Creator Max		|Yes					|?									|?								|      
+|Creator Pro		|No						|No									|No								|      
+|Creator Pro 2		|No						|No									|No								|      
+|Dreamer			|Yes					|?									|?								|      
+|Dreamer NX			|Yes					|?									|?								|      
+|Finder v1			|Yes					|Yes								|Yes							|      
+|Finder v2			|Yes					|Temp - Yes, Movement - ?			|?								|      
+|Explorer			|Yes					|?									|?								|      
+|Guider				|Yes					|?									|?								|      
+|Guider II			|Yes					|Temp - Yes, Movement - ?			|?								|      
+|Guider II S		|Yes					|Temp - Yes, Movement - ?			|?								|      
+|Inventor			|Yes					|?									|?								|      
+|Inventor II		|Yes					|?									|?								|      
+|Dremel 3D20		|Yes					|?									|?								|      
+|Dremel 3D40		|Yes					|?									|?								|      
+|Dremel 3D45		|Yes					|?									|?								|      
+|PowerSpec Ultra 3d	|Yes					|Yes								|Yes							|      
 
 \* May be issues with FlashForge Finder II, Guider II, Guider IIs - these printers do not support relative positioning so when you create your Printer Profile in OctoPrint you will need to go to the "Axes" tab and select "G91 Not Supported". If you still experience issues when using the controls please report with debug log files (see below for how to enable debugging).
 
