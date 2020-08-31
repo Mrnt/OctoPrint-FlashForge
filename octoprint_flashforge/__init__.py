@@ -210,10 +210,16 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
 
+			#TODO: detect printer state earlier in connection process and dont send M146, etc if the printer
+			# is already busy when we connect
 			#TODO: filter M146 and other commands? when printing from SD because they cause comms to hang
 
+			# allow a very limited set of commands while printing from SD to minimize problems...
+			if self._serial_obj.is_sd_printing() and gcode not in ["M24", "M25", "M26", "M27", "M105", "M112", "M114", "M117", "M400"]:
+				cmd = []
+
 			# homing
-			if gcode == "G28":
+			elif gcode == "G28":
 				cmd = cmd.replace('0', '')
 				if self.G91_disabled() and cmd == "G28 X Y":
 					# F2G2: does not support "G28 X Y"?
