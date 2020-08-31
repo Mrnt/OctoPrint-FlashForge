@@ -1,5 +1,9 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.2.2 (2020-08-27)
+### Bug Fixes
+* Dremel 3D20 should not drop connection (was timing out after 2s of nothing from host).
+
 ## 0.2.1 (2020-08-23)
 ### Bug Fixes
 * LED control now working.
