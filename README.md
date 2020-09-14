@@ -1,14 +1,18 @@
 # OctoPrint-FlashForge
 
-Adds support to the [OctoPrint](https://octoprint.org) 3D printer web interface for communication with closed source printers such as the:
-- FlashForge Creator Max, FlashForge Dreamer, FlashForge Dreamer NX, FlashForge Finder, FlashForge Finder II, FlashForge Guider II, FlashForge Guider IIs, FlashForge Inventor, FlashForge Ultra 2.0
+Adds support to the [OctoPrint](https://octoprint.org) 3D printer web interface for communication with closed source
+printers such as the:
+- FlashForge Creator Max, FlashForge Dreamer, FlashForge Dreamer NX, FlashForge Finder, FlashForge Finder II, FlashForge
+Guider II, FlashForge Guider IIs, FlashForge Inventor, FlashForge Ultra 2.0
 - PowerSpec Ultra 3DPrinter 2.0
 - Dremel Idea Builder 3D20, 3D45
 
-At the current time, plugin will only work with printers that support a connection to a host computer (eg RaspberryPi) via USB.
+At the current time, plugin will only work with printers that support a connection to a host computer (eg RaspberryPi)
+via USB.
 
 
-These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on older printers such as the FlashForge Creator Pro and a few similar printers which use the GPX protocol.
+These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on
+older printers such as the FlashForge Creator Pro and a few similar printers which use the GPX protocol.
 
 ## Current Capabilities
 
@@ -19,39 +23,46 @@ These printers are not supported by [Octoprint-GPX](https://github.com/markwal/O
     - Turn fans on and off
     - Extrude, retract*
     - Set color of the enclosure light, turn it on/off
-- Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
-- Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
-- Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint and then selecting file within OctoPrint. **Note: this is a new feature and there may be issues with reliability or even whether it will work at all on a given printer (it has only been tested on a PowerSpec Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bug reports.**
+- Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like
+FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
+- Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see
+[Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
+- Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint (prepared using
+FlashPrint or another slicer) and then selecting file within OctoPrint. **Note: this is a new feature and there may be
+issues with reliability or even whether it will work at all on a given printer (it has only been tested on a PowerSpec
+Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bug reports.**
 - Print directly from Cura via OctoPrint to SD card or direct (see warning on previous item).
 
 
 ### Printer Compatibility
-Shows current state of printer Compatibility for core OctoPrint functionality and will be updated as users provide feedback.
+Shows current state of printer Compatibility for core OctoPrint functionality and will be updated as users provide
+feedback.
 |Printer			|Upload File to SD Card |Control Movement and Temperature	|Print Directly From OctoPrint	|
-|---				|---					|---								|---							|      
-|Adventurer 3		|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
-|Adventurer 3C		|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
-|Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
-|Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|      
-|Creator Max		|Yes					|?									|?								|      
-|Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|      
+|---				|---					|---								|---							|
+|Adventurer 3		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
+|Adventurer 3C		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
+|Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|
+|Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|
+|Creator Max		|Yes					|?									|?								|
+|Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
 |Creator Pro 2		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
-|Dreamer			|Yes					|?									|?								|      
-|Dreamer NX			|Yes					|?									|?								|      
-|Finder v1			|Yes					|Yes								|Yes							|      
-|Finder v2			|Yes					|Temp - Yes, Movement - ?			|?								|      
-|Explorer			|Yes					|?									|?								|      
-|Guider				|Yes					|?									|?								|      
-|Guider II			|Yes					|Temp - Yes, Movement - ?			|?								|      
-|Guider II S		|Yes					|Temp - Yes, Movement - ?			|?								|      
-|Inventor			|Yes					|?									|?								|      
-|Inventor II		|Yes					|?									|?								|      
-|Dremel 3D20		|Yes					|?									|?								|      
-|Dremel 3D40		|Yes					|?									|?								|      
-|Dremel 3D45		|Yes					|?									|?								|      
-|PowerSpec Ultra 3d	|Yes					|Yes								|Yes							|      
+|Dreamer			|Yes					|?									|?								|
+|Dreamer NX			|Yes					|?									|?								|
+|Finder v1			|Yes					|Yes								|Yes							|
+|Finder v2			|Yes					|Temp - Yes, Movement - ?			|?								|
+|Explorer			|Yes					|?									|?								|
+|Guider				|Yes					|?									|?								|
+|Guider II			|Yes					|Temp - Yes, Movement - ?			|?								|
+|Guider II S		|Yes					|Temp - Yes, Movement - ?			|?								|
+|Inventor			|Yes					|?									|?								|
+|Inventor II		|Yes					|?									|?								|
+|Dremel 3D20		|Yes					|?									|?								|
+|Dremel 3D40		|Yes					|?									|?								|
+|Dremel 3D45		|Yes					|?									|?								|
+|PowerSpec Ultra 3d	|Yes					|Yes								|Yes							|
 
-\* May be issues with FlashForge Finder II, Guider II, Guider IIs - these printers do not support relative positioning so when you create your Printer Profile in OctoPrint you will need to go to the "Axes" tab and select "G91 Not Supported". If you still experience issues when using the controls please report with debug log files (see below for how to enable debugging).
+\* May be issues with FlashForge Finder II, Guider II, Guider IIs - these printers do not support relative positioning
+so when you create your Printer Profile in OctoPrint you will need to go to the "Axes" tab and select "G91 Not Supported". If you still experience issues when using the controls please report with debug log files (see below for how to enable debugging).
 
 
 ## Install
@@ -108,34 +119,55 @@ Under the main interface select "Auto" for "Serial Port".
 
 ### Additional Information
 
-Additional information on g-code supported by the printers, etc can be found in the [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki).
+Additional information on g-code supported by the printers, etc can be found in the
+[Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki).
 
-Plugin was inspired by work by [Noneus](https://github.com/Noneus) and information on these printers provided by users. If you discover an issue, figured out how to make out how to make it work better or have an idea for improvement please raise it as an [issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues).
+Plugin was inspired by work by [Noneus](https://github.com/Noneus) and information on these printers provided by users.
+If you discover an issue, figured out how to make out how to make it work better or have an idea for improvement please
+raise it as an [issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues).
 
 ## Known Issues
 
-* Currently will only reliably print using the "Upload to SD Card" button. As described above, the print from OctoPrint functionality is in place but is currently only tested (and somewhat reliable) on PowerSpec Ultra 3D, FlashForge Finder v1.
-* Clicking any button in the "Control" tab after clicking a "Home" button may cause the printer to drop the connection if it has not finished "homing".
-* Cannot use any controls (besides Pause, Cancel) while a print is in progress. Temperatures, and printer status CAN be monitored because these rely on  *unbuffered* g-code commands - see [G Code Commands](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary) for a list of unbuffered commands that should work via the Terminal tab when a print is in progress.
+* Currently will only reliably print using the "Upload to SD Card" button. As described above, the print from OctoPrint
+functionality is in place but is currently only tested (and somewhat reliable) on PowerSpec Ultra 3D, FlashForge Finder
+v1.
+* Clicking any button in the "Control" tab after clicking a "Home" button may cause the printer to drop the connection
+if it has not finished "homing".
+* Cannot use any controls (besides Pause, Cancel) while a print is in progress. Temperatures, and printer status CAN be
+monitored because these rely on  *unbuffered* g-code commands - see
+[G Code Commands](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary) for a list of unbuffered commands
+that should work via the Terminal tab when a print is in progress.
 * Cannot currently connect to the printer while a print is in progress.
 
 ## Troubleshooting
 
-* Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be restarted.
-If plugin does not appear in Plugin Manager list `libusb1` may need to be installed manually - current version of plugin should do this automatically.
+* Verify the plugin is enabled (Settings > Plugin Manager - "FlashForge" should be enabled), Octoprint may need to be
+restarted.
+If plugin does not appear in Plugin Manager list `libusb1` may need to be installed manually - current version of
+plugin should do this automatically.
 
-* If the plugin fails to detect or connect to the printer check the Terminal tab in Octoprint for errors and verify that you set up the Serial Connection settings as described in the Configuration section above.
+* If the plugin fails to detect or connect to the printer check the Terminal tab in Octoprint for errors and verify
+that you set up the Serial Connection settings as described in the Configuration section above.
 
-* If you are on OctoPi/Linux and see a USB permissions error then you will need to add a udev rule to allow access to the printer - see error message in the Terminal tab of Octoprint for instructions.
+* If you are on OctoPi/Linux and see a USB permissions error then you will need to add a udev rule to allow access to
+the printer - see error message in the Terminal tab of Octoprint for instructions.
 
-* Verify that the Serial Connection settings are set correctly, in particular the "Send a checksum with the command" setting.
+* Verify that the Serial Connection settings are set correctly, in particular the "Send a checksum with the command"
+setting.
 
-* Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set [octoprint.plugins.flashforge](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/images/LoggingSettings.png) to "DEBUG" and then click the "+" sign next to it, then click "Save") to help troubleshoot connection issues.
+* Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set
+[octoprint.plugins.flashforge](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/images/LoggingSettings.png) to "DEBUG"
+and then click the "+" sign next to it, then click "Save") to help troubleshoot connection issues.
 
-* After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging, octoprint.log) for clues. If you cannot resolve it, create an [Issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues) in github providing the platform (Windows/OctoPi/etc), hardware (PC/Raspberry Pi 3b/etc), Printer Model, Printer Firmware Version and upload the octoprint.log as a zip file.
+* After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging,
+octoprint.log) for clues. If you cannot resolve it, create an
+[Issue](https://github.com/Mrnt/OctoPrint-FlashForge/issues) in github providing the platform (Windows/OctoPi/etc),
+hardware (PC/Raspberry Pi 3b/etc), Printer Model, Printer Firmware Version and upload the octoprint.log as a zip file.
 
-* If you have a printer such as Finder II, Guider II and find that the movement controls under the "Control" tab do not seem to work,
-there is a setting under "Settings" > "Printer Profiles" > "Axes" where you can select G91 (relative positioning) not supported.
+* If you have a printer such as Finder II, Guider II and find that the movement controls under the "Control" tab do not
+seem to work,
+there is a setting under "Settings" > "Printer Profiles" > "Axes" where you can select G91 (relative positioning) not
+supported.
 
 ## Support Further Development
 

@@ -7,23 +7,7 @@ try:
 except ImportError:
 	import Queue as queue
 
-
-regex_SDPrintProgress = re.compile(b"(?P<current>[0-9]+)/(?P<total>[0-9]+)")
-"""
-Regex matching SD print progress from M27.
-"""
-regex_gcode = re.compile(b"^(?P<gcode>[GM][0-9]+)")
-"""
-Regex matching gcodes in write().
-"""
-regex_g1 = re.compile(b"G1(?=.* X(?P<X>-?[0-9.]+))?(?=.* Y(?P<Y>-?[0-9.]+))?(?=.* Z(?P<Z>-?[0-9.]+))?(?=.* E(?P<E>-?[0-9.]+))?(?=.* F(?P<F>[0-9.]+))?")
-"""
-Regex matching move G1 commands for noG91 handling.
-"""
-regex_M114position = re.compile(b"X:(?P<X>-?[0-9.]+) Y:(?P<Y>-?[0-9.]+) Z:(?P<Z>-?[0-9.]+) E0:(?P<E0>-?[0-9.]+)( E1:(?P<E1>-?[0-9.]+))?")
-"""
-Regex matching position values from M114
-"""
+from octoprint.settings import settings
 
 
 class FlashForgeError(Exception):
@@ -42,22 +26,37 @@ class FlashForge(object):
 	STATE_SD_PAUSED = 4
 	STATE_HOMING = 5
 	STATE_BUSY = 6
+	STATE_WAIT_ON_TEMP = 7
 
 	PRINTING_STATES = [STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED, STATE_HOMING]
 
+	regex_SDPrintProgress = re.compile(b"(?P<current>[0-9]+)/(?P<total>[0-9]+)")
+	""" Regex matching SD print progress from M27. """
+	regex_gcode = re.compile(b"^(?P<gcode>[GM][0-9]+)")
+	""" Regex matching gcodes in write(). """
+	regex_g1 = re.compile(
+		b"G[01](?=.* X(?P<X>-?[0-9.]+))?(?=.* Y(?P<Y>-?[0-9.]+))?(?=.* Z(?P<Z>-?[0-9.]+))?(?=.* E(?P<E>-?[0-9.]+))?(?=.* F(?P<F>[0-9.]+))?")
+	""" Regex matching move G1 commands for noG91 handling. """
+	regex_M114position = re.compile(
+		b"X:(?P<X>-?[0-9.]+) Y:(?P<Y>-?[0-9.]+) Z:(?P<Z>-?[0-9.]+) E0:(?P<E0>-?[0-9.]+)( E1:(?P<E1>-?[0-9.]+))?")
+	""" Regex matching position values from M114 """
 
-	def __init__(self, plugin, comm, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
+	def __init__(self, plugin, comm, port, vendor_id, device_id, seriallog_handler=None, read_timeout=10.0, write_timeout=10.0):
 		import logging
 		self._logger = logging.getLogger("octoprint.plugins.flashforge")
 		self._logger.debug("__init__()")
 
 		self._plugin = plugin
 		self._comm = comm
+		self._port = port
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
-		self._temp_interval = 0
-		self._M155_temp_interval = 0
-		self._autotemp = False
+		self._keep_alive_enabled = False
+		self._status_time = 0.0
+		self._temp_time = 0.0
+		self._temp_interval = 0.0
+		self._autotemp_enabled = True
+		self._is_autotemp = False
 		self._incoming = queue.Queue()
 		self._readlock = threading.Lock()
 		self._writelock = threading.Lock()
@@ -133,15 +132,7 @@ class FlashForge(object):
 												self._usb_sd_endpoint_in = endpoint_in
 												self._usb_sd_endpoint_out = endpoint_out
 												break
-								else:
-									continue
-								break
-							else:
-								continue
-							break
-						else:
-							continue
-						break
+
 					# if we don't have endpoints for SD upload then use the regular ones
 					if not self._usb_sd_endpoint_out:
 						self._usb_sd_endpoint_in = self._usb_cmd_endpoint_in
@@ -185,7 +176,7 @@ class FlashForge(object):
 	def write_timeout(self):
 		"""Return timeout for writes. OctoPrint Serial Factory property"""
 
-		self._logger.debug("FlashForge.write_timeout()")
+		self._logger.debug("write_timeout()")
 		return self._write_timeout
 
 
@@ -195,6 +186,12 @@ class FlashForge(object):
 
 		self._logger.debug("Setting write timeout to {}s".format(value))
 		self._write_timeout = value
+
+
+	@property
+	def port(self):
+		"""port name. OctoPrint Serial Factory property"""
+		return self._port
 
 
 	def _valid_command(self, command):
@@ -214,27 +211,43 @@ class FlashForge(object):
 		printer waiting for heatup, etc otherwise OctoPrint will think the printer is not responding...
 		"""
 		exit_flag = threading.Event()
-		temp_time = 0.0
-		status_time = 0.0
+		self._status_time = 0.0
+		self._temp_time = 0.0
 		keep_alive = 0.5
 		self._logger.debug("keep_alive() set to:{}".format(keep_alive))
 		# do not queue commands if the connection is going away
 		while self._handle and not self._disconnect_event:
-			temp_time += keep_alive
-			if self._temp_interval and temp_time >= self._temp_interval:
-				# do the fake auto reporting of temp OctoPrint
-				self._autotemp = True
-				self.write(b"M105")
-				temp_time = 0.0
-			status_time += keep_alive
-			if status_time >= 2.0:
-				# get status every 2s so printer gets something during long ops
-				# Dremel 3D20 seems to require something at least every 2s - other FF printers seem to be able to wait up to 3.5s
-				# may want to make this a setting
-				self.write(b"M119")
-				status_time = 0.0
+			if self._keep_alive_enabled:
+				# even though we have blocking on the write() routine we do not want to try to write while uploading to
+				# SD etc since it can generate confusion when the upload completes and a keep alive goes through at the
+				# same time
+				self._temp_time += keep_alive
+				if self._temp_interval and self._temp_time >= self._temp_interval:
+					# do the fake auto reporting of temp OctoPrint
+					self._is_autotemp = True
+					self.write(b"M105")
+					self._temp_time = 0.0
+				self._status_time += keep_alive
+				if self._status_time >= 2.0:
+					# get status every 2s so printer gets something during long ops
+					# Dremel 3D20 seems to require something at least every 2s - other FF printers seem to be able to wait up to 3.5s
+					# may want to make this a setting
+					self.write(b"M119")
+					self._status_time = 0.0
 			if exit_flag.wait(timeout=keep_alive):
 				exit()
+
+
+	def enable_keep_alive(self, enable):
+		"""Disable keep alive if we are streaming to the printer - eg file upload
+		Even though there is blocking on the read/write this helps prevent issues/simplifies
+		debugging during file upload and triggering a print
+		"""
+
+		self._keep_alive_enabled = enable
+		self._temp_time = 0.0
+		self._status_time = 0.0
+
 
 	def on_disconnect_event(self):
 		"""Called to signal we are disconnecting"""
@@ -263,7 +276,13 @@ class FlashForge(object):
 		return self._printerstate in [self.STATE_SD_PAUSED, self.STATE_SD_BUILDING]
 
 
+	def disable_autotemp(self):
+		"""Disable simulated auto temp reporting if printer claims to do it"""
+		self._autotemp_enabled = False
+
+
 	def disable_G91(self, disable):
+		"""Disable G91 support if prefs indicate printer does not support relative positioning"""
 		self._noG91 = disable
 
 
@@ -273,7 +292,7 @@ class FlashForge(object):
 		Formats the commands sent by OctoPrint to make them FlashForge friendly.
 		"""
 
-		self._logger.debug("FlashForge.write() called by thread {}".format(threading.currentThread().getName()))
+		self._logger.debug("write() called by thread {}".format(threading.currentThread().getName()))
 		if not self._handle:
 			# do not queue commands if the connection is going away
 			return
@@ -281,18 +300,12 @@ class FlashForge(object):
 		# save the length for return on success
 		data_len = len(data)
 
-		match = regex_gcode.search(data)
+		match = FlashForge.regex_gcode.search(data)
 		if match:
 			try:
 				gcode = match.group("gcode")
 			except:
 				pass
-			else:
-				if gcode == b"M155":
-					# we don't support M155 but have to handle it here instead rewrite() so that OctoPrint thinks it sent it
-					self._M155_temp_interval = int(re.search("S([0-9]+)", data.decode()).group(1))
-					self._temp_interval = self._M155_temp_interval
-					data = b"M155 S0"
 
 		self._writelock.acquire()
 
@@ -309,10 +322,10 @@ class FlashForge(object):
 			payload = b"" if len(cmd) == 1 else cmd[1]
 			gcode = cmd[0]
 
-			if gcode == b"G1" and self._noG91 and self._relative_pos:
+			if gcode in [b"G0", b"G1"] and self._noG91 and self._relative_pos:
 				# try to convert relative positioning to absolute
 				self._logger.debug("G1 with rel pos")
-				match = regex_g1.search(data)
+				match = FlashForge.regex_g1.search(data)
 				if match:
 					self._logger.debug("G1 {0}".format(match.groupdict()))
 					data = b"G1"
@@ -334,6 +347,18 @@ class FlashForge(object):
 				self._relative_pos = True
 				if self._noG91:
 					data = b"G90"
+			elif gcode == b"M23":
+				# we started an SD print - make sure to set printer state
+				self._status_time = 0.0
+				data += b"\r\nM119"
+			elif gcode == b"M27":
+				# make sure we have the current printer status before getting SD card progress, because SD card
+				# progress reports printing when cancelled or finished...
+				self._status_time = 0.0
+				data = b"M119\r\n~M27"
+				self._status_time = 0.0
+			elif gcode == b"M105":
+				self._temp_time = 0.0
 			elif gcode == b"M108":
 				self._extruder = "E1" if b"T1" in payload else "E0"
 				self._logger.debug("select extruder {0}".format(self._extruder))
@@ -378,20 +403,33 @@ class FlashForge(object):
 
 		self._readlock.acquire()
 
+		# return any line we have buffered
 		if not self._incoming.empty():
 			self._readlock.release()
 			return self._incoming.get_nowait()
 
+		# fetch some data
 		data = self.readraw()
-		#if not data.strip().endswith(b"ok") and len(data):
-		#	data += self.readraw()
+		# parse and buffer it
+		data = self._parse_data(data)
 
-		# translate returned data into something OctoPrint understands
+		self._logger.debug("readline() returning: {}".format(data.decode().replace('\r\n', ' | ')))
+		self._readlock.release()
+		# return the buffer
+		return self._incoming.get_nowait()
+
+
+	def _parse_data(self, data):
+		"""Parse raw data from printer into lines and buffer them
+
+		Manipulates printer response if necessary into something OctoPrint understands, breaks into lines and stores
+		in a buffer for readline() method.
+		"""
 		if len(data):
 			if b"CMD M27 " in data:
 				# need to filter out bogus SD print progress from cancelled or paused prints
 				if b"printing byte" in data and self._printerstate in [self.STATE_UNKNOWN, self.STATE_READY, self.STATE_SD_PAUSED]:
-					match = regex_SDPrintProgress.search(data)
+					match = FlashForge.regex_SDPrintProgress.search(data)
 					if match:
 						try:
 							current = int(match.group("current"))
@@ -399,6 +437,8 @@ class FlashForge(object):
 						except:
 							pass
 						else:
+							# Note: there is an issue with .gx files indicating the current byte size is greater than the
+							# total when the print is started
 							if self._printerstate == self.STATE_READY and current >= total:
 								# Ultra 3D: after completing print it still indicates SD card progress
 								data = b"CMD M27 Received.\r\nDone printing file\r\nok\r\n"
@@ -416,7 +456,7 @@ class FlashForge(object):
 						data += b"ok\r\n"
 
 			elif b"CMD M105 " in data:
-				if self._autotemp:
+				if self._is_autotemp:
 					# this was generated as an auto temp report by our keep alive so filter out the CMD and OK
 					# so as not to confuse the OctoPrint buffer counter
 					data = data.replace(b"CMD M105 Received.\r\n", b"")
@@ -425,12 +465,12 @@ class FlashForge(object):
 					if not (b"CMD " in data and self._printerstate in [self.STATE_SD_BUILDING, self.STATE_SD_PAUSED]):
 						# do not drop the "ok" if there is the response to another command in here and we are printing from SD?
 						data = data.replace(b"\r\nok", b"")
-				self._autotemp = False
+				self._is_autotemp = False
 
 			elif b"CMD M114 " in data:
 				# looks like get current position returns A: and B: for extruders?
 				data = data.replace(b" A:", b" E0:").replace(b" B:", b" E1:")
-				match = regex_M114position.search(data)
+				match = FlashForge.regex_M114position.search(data)
 				if match:
 					for k, v in match.groupdict().items():
 						if v != None:
@@ -439,16 +479,19 @@ class FlashForge(object):
 
 			elif b"CMD M115 " in data:
 				# Try to make the firmware response more readable by OctoPrint
-				# Fake autotemp reporting capability - we can do it as part of the keep alive. Means we will still get
-				# temp updates while OctoPrint is waiting for blocking commands to be processed in the queue
-				data = data.replace(b"Firmware:", b"FIRMWARE_NAME: FlashForge VER:")#.\
-				#	replace(b"\r\nok", b"\r\nCap:AUTOREPORT_TEMP:1\r\nok")
+				data = data.replace(b"Firmware:", b"FIRMWARE_NAME: FlashForge VER:")
 
 			elif b"CMD M119 " in data:
 				# this was generated by us so do not return anything to OctoPrint
 				oldstate = self._printerstate
-				if b"MachineStatus: READY" in data and b"MoveMode: READY" in data:
-					self._printerstate = self.STATE_READY
+				if b"MachineStatus: READY" in data:
+					if b"MoveMode: READY" in data:
+						self._printerstate = self.STATE_READY
+					elif b"MoveMode: WAIT_ON_" in data:
+						# printing directly and printer waiting for bed or extruder to heat up
+						self._printerstate = self.STATE_WAIT_ON_TEMP
+					else:
+						self._printerstate = self.STATE_BUSY
 				elif b"MachineStatus: BUILDING_FROM_SD" in data:
 					if b"MoveMode: PAUSED" in data:
 						self._printerstate = self.STATE_SD_PAUSED
@@ -466,16 +509,19 @@ class FlashForge(object):
 
 				if oldstate != self._printerstate:
 					self._logger.debug("state changed from {} to {}".format(oldstate, self._printerstate))
-					# force temp reporting if busy so OctoPrint sees something
-					if self._M155_temp_interval:
-						self._temp_interval = self._M155_temp_interval
+					# force temp reporting if busy while direct printing and waiting for extruder/bed to heat up
+					# (unless printer reports autotemp) so OctoPrint sees something.
+					# TODO: use OctoPrint state instead to decide when to do the temp check - ie if printing and temp wait
+					if self._printerstate == self.STATE_WAIT_ON_TEMP and self._autotemp_enabled:
+						self._temp_interval = settings().getFloat(["serial", "timeout", "temperatureAutoreport"])
 					else:
-						self._temp_interval = 0 if self._printerstate == self.STATE_READY else 3
+						self._temp_interval = 0.0
 
 			if len(data):
 				# turn data into list of lines
 				datalines = data.splitlines()
 				for i, line in enumerate(datalines):
+					self._logger.debug("buffering: {}".format(line))
 					self._incoming.put(line)
 
 					# if M20 (list SD card files) does not return anything, make it look like an empty file list
@@ -489,9 +535,7 @@ class FlashForge(object):
 		else:
 			self._incoming.put(data)
 
-		self._logger.debug("readline() returning: {}".format(data.decode().replace('\r\n', ' | ')))
-		self._readlock.release()
-		return self._incoming.get_nowait()
+		return data
 
 
 	def readraw(self, timeout=-1):
@@ -531,9 +575,16 @@ class FlashForge(object):
 
 		# read response, make sure we are getting the command we sent
 		gcode = b"CMD %s " % cmd.split(b" ", 1)[0]
-		response = b" "
-		while response and gcode not in response:
+		response = b""
+		while True:
 			response = self.readraw(timeout)
+			# TODO: if response is multiline and contains response to a previous command as well as this one then
+			#  we lose the previous command. We might need to parse each line and save old responses into the buffer
+			if not response or gcode in response:
+				break
+			# we got the response from some previous OctoPrint command so parse it into the buffer used for
+			# OctoPrint listener so it will be read later
+			self._parse_data(response)
 		if b"ok\r\n" in response:
 			self._logger.debug("sendcommand() got an ok")
 			return True, response
