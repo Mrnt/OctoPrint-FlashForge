@@ -122,8 +122,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		for device in self._usbcontext.getDeviceIterator(skip_on_error=True):
 			vendor_id = device.getVendorID()
 			device_id = device.getProductID()
-			device_name = 'unknown'
+			device_name = 'unknown printer'
 			try:
+				# this will typically fail if we don't have permission to access this USB device
 				device_name = device.getProduct()
 			except usb1.USBError as usberror:
 				self._logger.debug('Unable to get printer name {}'.format(usberror))

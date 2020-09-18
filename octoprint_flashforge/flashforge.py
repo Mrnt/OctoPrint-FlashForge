@@ -98,7 +98,7 @@ class FlashForge(object):
 										  "5) Verify the file permissions are set to \"rw-r--r--\" by typing:\r\n"
 										  "ls -al /etc/udev/rules.d/99-octoprint.rules\r\n"
 										  "6) Reboot your system for the rule to take effect.\r\n\r\n"
-										  "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\r\n\r\n".format(printer.vid, printer.vid))
+										  "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\r\n\r\n".format(printer["vid"], printer["vid"]))
 				except usb1.USBError as usberror:
 					raise FlashForgeError('Unable to connect to FlashForge printer - may already be in use', usberror)
 				break
