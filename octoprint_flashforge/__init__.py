@@ -41,6 +41,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._serial_obj = None
 		self._currentFile = None
 		self._upload_percent = 0
+		self._usbcontext = None
 		self._printers = {}
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
@@ -114,54 +115,44 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			return self._printers
 
 		self._printers = {}
-		with usb1.USBContext() as usbcontext:
-			for device in usbcontext.getDeviceIterator(skip_on_error=True):
-				vendor_id = device.getVendorID()
-				device_id = device.getProductID()
-				try:
-					device_name = device.getProduct()
-				except:
-					device_name = 'unknown'
-				self._logger.debug(
-					"Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id,
-																						device_id))
+		if not self._usbcontext:
+			self._usbcontext = usb1.USBContext()
+			self._usbcontext.open()
 
-				if vendor_id in self.VENDOR_IDS:
-					if device_name == "unknown":
-						# we have a printer but something wrong with it or the USB system
-						raise flashforge.FlashForgeError("Found printer but there is a connection problem - reboot printer.")
-						continue
-					vendor_name = self.VENDOR_IDS[vendor_id]
-					self._logger.info("Found a {} {}".format(vendor_name, self.PRINTER_IDS[vendor_name][device_id]))
-					self._printers[device_name] = {'vid': vendor_id, 'vname': vendor_name, 'did': device_id}
-					# get USB interface details to diagnose connectivity issues
-					for configuration in device.iterConfigurations():
-						for interface in configuration:
-							for setting in interface:
-								self._logger.debug(
-									" setting number: 0x{:02x}, class: 0x{:02x}, subclass: 0x{:02x}, protocol: 0x{:02x}, #endpoints: {}, descriptor: {}".format(
-										setting.getNumber(), setting.getClass(), setting.getSubClass(),
-										setting.getProtocol(), setting.getNumEndpoints(), setting.getDescriptor()))
-								for endpoint in setting:
-									self._logger.debug(
-										"  endpoint address: 0x{:02x}, attributes: 0x{:02x}, max packet size: {}".format(
-											endpoint.getAddress(), endpoint.getAttributes(),
-											endpoint.getMaxPacketSize()))
+		for device in self._usbcontext.getDeviceIterator(skip_on_error=True):
+			vendor_id = device.getVendorID()
+			device_id = device.getProductID()
+			device_name = 'unknown'
+			try:
+				device_name = device.getProduct()
+			except usb1.USBError as usberror:
+				self._logger.debug('Unable to get printer name {}'.format(usberror))
+			self._logger.debug(
+				"Found device '{}' with Vendor ID: {:#06X}, USB ID: {:#06X}".format(device_name, vendor_id,
+																					device_id))
+
+			if vendor_id in self.VENDOR_IDS:
+				# we have a printer of some kind
+				bus = device.getBusNumber()
+				addr = device.getDeviceAddress()
+				device_name += ", port:{}:{}".format(bus, addr)
+				vendor_name = self.VENDOR_IDS[vendor_id]
+				self._logger.info("Found a {} {}".format(vendor_name, device_name))
+				self._printers[device_name] = {'bus': bus, 'addr': addr, 'vid': vendor_id}
 
 
-	def printer_factory(self, comm, port, baudrate, read_timeout, *args, **kwargs):
+	def printer_factory(self, comm, portname, baudrate, read_timeout, *args, **kwargs):
 		""" OctoPrint hook - Called when creating printer connection
 
 			Test for presence of a supported printer and then try to connect
 		"""
-		if port not in self._printers:
+		if portname not in self._printers:
 			# requested port not in our list
 			return None
 
 		self._comm = comm
-		serial_obj = flashforge.FlashForge(self, comm, port, self._printers[port]['vid'], self._printers[port]['did'],
+		serial_obj = flashforge.FlashForge(self, comm, self._usbcontext, portname, self._printers[portname],
 										   read_timeout=float(read_timeout))
-
 		return serial_obj
 
 
@@ -345,7 +336,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			self._serial_obj.enable_keep_alive(False)
 			self._serial_obj.makeexclusive(True)
-			error = "could not start tx"
 
 			# make sure heaters are off
 			self._serial_obj.sendcommand(b"M104 S0 T0")
@@ -357,7 +347,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				error = "file transfer not started {}".format(answer)
 			else:
 				self._logger.debug("M28 file tx started")
-				error = ""
 
 			try:
 				while chunk_start_index < file_size:
@@ -386,9 +375,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					else:
 						error = "File transfer incomplete"
 
-			except flashforge.FlashForgeError as error:
+			except flashforge.FlashForgeError:
 				error = "File transfer incomplete"
-				pass
 
 			if error:
 				self._logger.info("Upload failed: {}".format(error))
