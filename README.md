@@ -25,13 +25,13 @@ older printers such as the FlashForge Creator Pro and a few similar printers whi
     - Set color of the enclosure light, turn it on/off
 - Upload a FlashPrint prepared .gx or .g file using the "Upload to SD" button which will immediately start a print (like
 FlashPrint), you should be able to pause, resume, cancel the print using the respective buttons.
-- Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (see
+- Upload a Cura prepared .gcode file using the "Upload to SD" button or directly to the SD card from Cura (note that some Cura generated g-code commands are not compatable with FlashForge printers, see
 [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki) for details).
 - Print directly from within OctoPrint - i.e. using the "Upload" button to upload a file into OctoPrint (prepared using
 FlashPrint or another slicer) and then selecting file within OctoPrint. **Note: this is a new feature and there may be
 issues with reliability or even whether it will work at all on a given printer (it has only been tested on a PowerSpec
 Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bug reports.**
-- Print directly from Cura via OctoPrint to SD card or direct (see warning on previous item).
+- Print directly from Cura via OctoPrint to SD card or direct (see warnings on previous 2 items).
 
 
 ### Printer Compatibility
@@ -43,7 +43,7 @@ feedback.
 |Adventurer 3C		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
 |Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|
 |Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|
-|Creator Max		|Yes					|?									|?								|
+|Creator Max		|?					    |?									|?								|
 |Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
 |Creator Pro 2		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
 |Dreamer			|Yes					|?									|?								|
