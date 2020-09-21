@@ -190,11 +190,6 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("on_connect()")
 		self._serial_obj = serial_obj
 
-		thread = threading.Thread(target=serial_obj.keep_alive, name="FlashForge.Keep_Alive")
-		thread.daemon = True
-		serial_obj.enable_keep_alive(True)
-		thread.start()
-
 
 	def on_disconnect(self):
 		self._logger.debug("on_disconnect()")
@@ -212,6 +207,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	def rewrite_gcode(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
 		if self._serial_obj:
 
+			# Commands should begin with G,M,T
 			if not re.match(r'^[GMT]\d+', cmd):
 				# most likely part of the header in a .gx FlashPrint file
 				self._logger.debug("rewrite_gcode(): unrecognized command")
@@ -224,7 +220,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# TODO: filter M146 and other commands? when printing from SD because they cause comms to hang
 
 			# allow a very limited set of commands while printing from SD to minimize problems...
-			if self._serial_obj.is_sd_printing() and gcode not in ["M24", "M25", "M26", "M27", "M105", "M112", "M114", "M117", "M400"]:
+			if self._serial_obj.is_sd_printing() and gcode not in ["M24", "M25", "M26", "M27", "M105", "M112", "M114", "M115", "M117", "M400"]:
 				cmd = []
 
 			# homing

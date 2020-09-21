@@ -1,5 +1,13 @@
 # OctoPrint-FlashForge Changelog
 
+## 0.2.4 (2020-09-21)
+### New Feature
+* Can have more than one printer of the same type connected - the "Serial Port" name will contain the printer name
+and USB port#
+* Try to handle emergency stop M112 (some of the time it still leaves the printer/USB stack in a unstable state)
+### Bug Fixes
+* Regression bug - On new RPi installs, may not be able to connect and get message about setting up USB permissions
+
 ## 0.2.3 (2020-09-12)
 ### Bug Fixes
 * Regression bug - After upload to SD card the Pause, Cancel controls are sometimes not enabled.
