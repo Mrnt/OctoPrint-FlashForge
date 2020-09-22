@@ -331,8 +331,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._upload_percent = 0
 			chunk_start_index = 0
 
-			self._serial_obj.enable_keep_alive(False)
+			# there must be something coming back from the printer (eg keep alive) or we will block here until the
+			# Octoprint comm monitor readline times out
 			self._serial_obj.makeexclusive(True)
+			self._serial_obj.enable_keep_alive(False)
 
 			# make sure heaters are off
 			self._serial_obj.sendcommand(b"M104 S0 T0")
@@ -345,35 +347,35 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			else:
 				self._logger.debug("M28 file tx started")
 
-			try:
-				while chunk_start_index < file_size:
-					chunk_end_index = min(chunk_start_index + self.FILE_PACKET_SIZE, file_size)
-					chunk = bgcode[chunk_start_index:chunk_end_index]
-					if not chunk:
-						error = "unexpected eof"
-						break
+				try:
+					while chunk_start_index < file_size:
+						chunk_end_index = min(chunk_start_index + self.FILE_PACKET_SIZE, file_size)
+						chunk = bgcode[chunk_start_index:chunk_end_index]
+						if not chunk:
+							error = "unexpected eof"
+							break
 
-					if self._serial_obj.writeraw(chunk, False):
-						upload_percent = 100.0 * chunk_end_index / file_size
-						self.upload_percent = int(upload_percent)
-						self._logger.debug("Sent: %.2f%% %d/%d" % (self.upload_percent, chunk_end_index, file_size))
-					else:
-						error = "File transfer interrupted"
-						break
+						if self._serial_obj.writeraw(chunk, False):
+							upload_percent = 100.0 * chunk_end_index / file_size
+							self.upload_percent = int(upload_percent)
+							self._logger.debug("Sent: %.2f%% %d/%d" % (self.upload_percent, chunk_end_index, file_size))
+						else:
+							error = "File transfer interrupted"
+							break
 
-					chunk_start_index += self.FILE_PACKET_SIZE
+						chunk_start_index += self.FILE_PACKET_SIZE
 
-				if not error:
-					result, response = self._serial_obj.sendcommand(b"M29", 10000)
-					if result and b"CMD M28" in response:
-						response = self._serial_obj.readraw(1000)
-					if result and b"failed" not in response:
-						sd_upload_succeeded(filename, remote_name, 10)
-					else:
-						error = "File transfer incomplete"
+					if not error:
+						result, response = self._serial_obj.sendcommand(b"M29", 10000)
+						if result and b"CMD M28" in response:
+							response = self._serial_obj.readraw(1000)
+						if result and b"failed" not in response:
+							sd_upload_succeeded(filename, remote_name, 10)
+						else:
+							error = "File transfer incomplete"
 
-			except flashforge.FlashForgeError:
-				error = "File transfer incomplete"
+				except flashforge.FlashForgeError:
+					error = "File transfer incomplete"
 
 			if error:
 				self._logger.info("Upload failed: {}".format(error))

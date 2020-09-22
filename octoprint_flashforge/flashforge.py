@@ -50,6 +50,7 @@ class FlashForge(object):
 		self._plugin = plugin
 		self._comm = comm
 		self._usbcontext = usbcontext
+		self._handle = None
 		self._portname = portname
 		self._read_timeout = read_timeout
 		self._write_timeout = write_timeout
@@ -208,6 +209,7 @@ class FlashForge(object):
 	def _valid_command(self, command):
 		""" Check if command is valid for FF (allow line numbers N for emergency shutdown M112)
 
+		M117 seems to cause issues during SD printing, but has to get this far to allow DisplayLayerPlugin to work
 		"""
 		gcode = command.split(b' ', 1)[0]
 		return (gcode[0] in b"GMN") and gcode not in [b"M117"]
@@ -255,7 +257,7 @@ class FlashForge(object):
 		Even though there is blocking on the read/write this helps prevent issues/simplifies
 		debugging during file upload and triggering a print
 		"""
-
+		self._logger.debug("enable_keep_alive({})".format(enable))
 		self._keep_alive_enabled = enable
 		self._temp_time = 0.0
 		self._status_time = 0.0
@@ -624,9 +626,7 @@ class FlashForge(object):
 			self._logger.debug("closing handle...")
 			if not self._readlock.locked():
 				# TODO: try to fetch any pending replies from the printer.
-				#  This doesn't really work properly right now as the octorint comm.monitor thread often has the lock
-				#  when shutdown happens, but if we instead wait on that thread shutdown could take as long as the
-				#  current read timeout.
+				#  This doesn't really work properly right now as sometimes the printer stops returning responses...
 				#  Unfortunately if we close the port without reading all pending data it seems to break subsequent
 				#  connections to the printer, requiring a printer reboot
 				self._readlock.acquire()
@@ -648,6 +648,7 @@ class FlashForge(object):
 			except usb1.USBError as usberror:
 				raise FlashForgeError("Error closing USB handle", usberror)
 			self._handle = None
+
 		self._incoming = None
 
 		self._plugin.on_disconnect()
