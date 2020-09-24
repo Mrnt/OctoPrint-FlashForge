@@ -8,7 +8,7 @@ Guider II, FlashForge Guider IIs, FlashForge Inventor, FlashForge Ultra 2.0
 - Dremel Idea Builder 3D20, 3D45
 
 At the current time, plugin will only work with printers that support a connection to a host computer (eg RaspberryPi)
-via USB.
+via a USB connection (using a USB type B connector on the printer).
 
 
 These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on
