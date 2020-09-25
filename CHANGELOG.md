@@ -6,7 +6,8 @@
 and USB port#
 * Try to handle emergency stop M112 (some of the time it still leaves the printer/USB stack in a unstable state)
 ### Bug Fixes
-* Regression bug - On new RPi installs, may not be able to connect and get message about setting up USB permissions
+* Regression bug - On new RPi installs, may not be able to connect and get message about setting up USB permissions #51
+* Cannot create new Printer Profile with this plugin installed. #52
 
 ## 0.2.3 (2020-09-12)
 ### Bug Fixes
