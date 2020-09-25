@@ -74,7 +74,7 @@ $(function () {
 				}
 				if ($('#ff_noG91').length)
 					$('#ff_noG91').prop('checked', data.ff.noG91);
-				};
+			};
 
 			// save profile
 			self.editor.toProfileData = function() {
