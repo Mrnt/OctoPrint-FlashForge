@@ -72,6 +72,8 @@ class FlashForge(object):
 		self._pos = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E0": 0.0, "E1": 0.0}
 		self._extruder = "E0"
 
+		self._usb_vid = printer["vid"]
+		self._usb_id = printer["did"]
 		self._usb_cmd_endpoint_in = 0
 		self._usb_cmd_endpoint_out = 0
 		self._usb_sd_endpoint_in = 0
@@ -204,6 +206,11 @@ class FlashForge(object):
 	def port(self):
 		"""port name. OctoPrint Serial Factory property"""
 		return self._portname
+
+
+	def USB_id(self):
+		""" Get vendor and device USB IDs """
+		return self._usb_vid, self._usb_id
 
 
 	def _valid_command(self, command):

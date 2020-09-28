@@ -22,13 +22,16 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					   octoprint.plugin.AssetPlugin,
 					   octoprint.plugin.TemplatePlugin):
 	VENDOR_IDS = {0x0315: "PowerSpec", 0x2a89: "Dremel", 0x2b71: "FlashForge"}
-	PRINTER_IDS = {
-		"PowerSpec": {0x0001: "Ultra 3DPrinter (C)"},
-		"Dremel": {0x8889: "Dremel IdeaBuilder 3D20", 0x888d: "Dremel IdeaBuilder 3D45"},
-		"FlashForge": {0x0001: "Dreamer", 0x0002: "Finder v1", 0x0004: "Guider II", 0x0005: "Inventor",
-					   0x0007: "Finder v2", 0x0009: "Guider IIs", 0x000A: "Dreamer NX",
-					   0x00e7: "Creator Max", 0x00ee: "Finder v2.12",
-					   0x00f6: "PowerSpec Ultra 3DPrinter (B)", 0x00ff: "PowerSpec Ultra 3DPrinter (A)"}}
+	PRINTER_PROFILES = {
+		0x0315: {0x0001: {"name": "Ultra 3DPrinter (C)"}},  # PowerSpec
+		0x2a89: {0x8889: {"name": "Dremel IdeaBuilder 3D20"}, 0x888d: {"name": "Dremel IdeaBuilder 3D45"}},  # Dremel
+		0x2b71: {0x0001: {"name": "Dreamer"}, 0x0002: {"name": "Finder v1"},  # FlashForge
+					   0x0004: {"name": "Guider II"}, 0x0005: {"name": "Inventor"},
+					   0x0007: {"name": "Finder v2", "sdpath": "data/"},
+					   0x0009: {"name": "Guider IIs"}, 0x000A: {"name": "Dreamer NX"},
+					   0x00e7: {"name": "Creator Max"}, 0x00ee: {"name": "Finder v2.12"},
+					   0x00f6: {"name": "PowerSpec Ultra 3DPrinter (B)"},
+					   0x00ff: {"name": "PowerSpec Ultra 3DPrinter (A)"}}}
 	FILE_PACKET_SIZE = 1024
 
 
@@ -139,7 +142,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				device_name += ", port:{}:{}".format(bus, addr)
 				vendor_name = self.VENDOR_IDS[vendor_id]
 				self._logger.info("Found a {} {}".format(vendor_name, device_name))
-				self._printers[device_name] = {'bus': bus, 'addr': addr, 'vid': vendor_id}
+				self._printers[device_name] = {'bus': bus, 'addr': addr, 'vid': vendor_id, 'did': device_id}
 
 
 	def printer_factory(self, comm, portname, baudrate, read_timeout, *args, **kwargs):
@@ -184,6 +187,14 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				gx=["gx"]			# Every other FlashForge based printer
 			)
 		)
+
+
+	def printer_profile(self, vid, did):
+		""" Fetch any info we have about the printer using the USB vendor & device IDs """
+		profile = {"name": b"unknown", "noG91": False, "sdpath": "user/"}
+		if did in self.PRINTER_PROFILES[vid]:
+			profile = dict_merge(profile, self.PRINTER_PROFILES[vid][did])
+		return profile
 
 
 	def on_connect(self, serial_obj):
@@ -318,6 +329,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 	# Uploading files directly to internal SD card
 	def upload_to_sd(self, printer, filename, path, sd_upload_started, sd_upload_succeeded, sd_upload_failed, *args,
 					 **kwargs):
+		""" OctoPrint hook - Called when uploading to SD card
+
+		Note the filename can contain a sub-folder path to the place on OctoPrint where the file is located!
+		"""
 
 		if not self._serial_obj:
 			return
@@ -341,8 +356,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.sendcommand(b"M104 S0 T1")
 			self._serial_obj.sendcommand(b"M140 S0")
 
-			ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
-			if not ok:
+			ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/%s" % (file_size, remote_name.encode()), 5000)
+			if not ok or b"open failed" in answer:
 				error = "file transfer not started {}".format(answer)
 			else:
 				self._logger.debug("M28 file tx started")
@@ -387,19 +402,26 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.makeexclusive(False)
 			self._serial_obj.enable_keep_alive(True)
 			# NB M23 select will also trigger a print on FlashForge
-			self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
+			self._comm.selectFile("0:/%s\r\n" % remote_name, True)
 			# TODO: need to set the correct file size for the progress indicator
 
-		bgcode = b""
-		file_size = 0
-		# unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote file
-		# the same as the source and hope for the best
-		remote_name = filename
+		try:
+			bgcode = b""
+			file_size = 0
+			# Unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote
+			# file the same as the source and hope for the best
+			# Some printers use a different destination path so fetch from hard coded profile (hopefully always the same
+			# for a given printer model)
+			vid, did = self._serial_obj.USB_id()
+			remote_name = self.printer_profile(vid, did)['sdpath'] + filename.split("/")[-1]
 
-		file = open(path, "rb")
-		bgcode = file.read()
-		file_size = len(bgcode)
-		file.close()
+			file = open(path, "rb")
+			bgcode = file.read()
+			file_size = len(bgcode)
+			file.close()
+		except:
+			sd_upload_failed(filename, remote_name, 10)
+			return None
 
 		self._logger.info("Starting SDCard upload from {} to {}".format(filename, remote_name))
 		sd_upload_started(filename, remote_name)
