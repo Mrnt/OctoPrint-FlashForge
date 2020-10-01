@@ -125,7 +125,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		for device in self._usbcontext.getDeviceIterator(skip_on_error=True):
 			vendor_id = device.getVendorID()
 			device_id = device.getProductID()
-			device_name = 'unknown printer'
+			device_name = 'unknown device'
 			try:
 				# this will typically fail if we don't have permission to access this USB device
 				device_name = device.getProduct()
@@ -251,8 +251,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				else:
 					self._serial_obj.disable_G91(False)
 
-			# M20 list SD card, M21 init SD card - do not do if we are busy, seems to cause issues
-			elif (gcode == "M20" or gcode == "M21") and not self._serial_obj.is_ready():
+			# M20 list SD card, M21 init SD card - do not work and some printers may not respond causing timeouts,
+			# so ignore them
+			elif (gcode == "M20" or gcode == "M21"):
 				cmd = []
 
 			# M25 = pause

@@ -542,12 +542,6 @@ class FlashForge(object):
 				for i, line in enumerate(datalines):
 					self._logger.debug("buffering: {}".format(line))
 					self._incoming.put(line)
-
-					# if M20 (list SD card files) does not return anything, make it look like an empty file list
-					if b"CMD M20 " in line and datalines[i+1] and datalines[i+1] == b"ok":
-						# fetch SD card list does not get anything so fake out a result
-						self._incoming.put(b"Begin file list")
-						self._incoming.put(b"End file list")
 			else:
 				self._incoming.put(data)
 
