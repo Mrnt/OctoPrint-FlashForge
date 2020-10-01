@@ -357,7 +357,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.sendcommand(b"M104 S0 T1")
 			self._serial_obj.sendcommand(b"M140 S0")
 
-			ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/%s" % (file_size, remote_name.encode()), 5000)
+			ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
 			if not ok or b"open failed" in answer:
 				error = "file transfer not started {}".format(answer)
 			else:
@@ -403,7 +403,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.makeexclusive(False)
 			self._serial_obj.enable_keep_alive(True)
 			# NB M23 select will also trigger a print on FlashForge
-			self._comm.selectFile("0:/%s\r\n" % remote_name, True)
+			self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
 			# TODO: need to set the correct file size for the progress indicator
 
 		try:
@@ -414,7 +414,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# Some printers use a different destination path so fetch from hard coded profile (hopefully always the same
 			# for a given printer model)
 			vid, did = self._serial_obj.USB_id()
-			remote_name = self.printer_profile(vid, did)['sdpath'] + filename.split("/")[-1]
+			remote_name = filename.split("/")[-1]
 
 			file = open(path, "rb")
 			bgcode = file.read()
