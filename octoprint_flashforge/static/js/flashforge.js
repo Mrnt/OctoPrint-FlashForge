@@ -63,12 +63,12 @@ $(function () {
 		self.editor = self.printerProfileViewModel.editor;
 		if (self.editor.fromProfileData !== undefined && self.editor.toProfileData !== undefined) {
 			// override the functions for syncing profile data with the page
-			self.editor.origFromProfileData = self.editor.fromProfileData;
-			self.editor.origToProfileData = self.editor.toProfileData;
+			self.origFromProfileData = self.editor.fromProfileData;
+			self.origToProfileData = self.editor.toProfileData;
 
 			// load profile
 			self.editor.fromProfileData = function(data) {
-				this.origFromProfileData(data);
+				self.origFromProfileData(data);
 				if (data === undefined) {
 					data = cleanProfile();
 				}
@@ -78,7 +78,7 @@ $(function () {
 
 			// save profile
 			self.editor.toProfileData = function() {
-				profile = this.origToProfileData();
+				profile = self.origToProfileData();
 				profile.ff = cleanProfile().ff;
 				if ($('#ff_noG91').length)
 					profile.ff.noG91 = $('#ff_noG91').prop('checked');

@@ -66,14 +66,13 @@ class FlashForge(object):
 		self._writelock = threading.Lock()
 		self._printerstate = self.STATE_UNKNOWN
 		self._disconnect_event = False
+		self._sdtotal = 0
 
 		self._noG91 = False
 		self._relative_pos = False
 		self._pos = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E0": 0.0, "E1": 0.0}
 		self._extruder = "E0"
 
-		self._usb_vid = printer["vid"]
-		self._usb_id = printer["did"]
 		self._usb_cmd_endpoint_in = 0
 		self._usb_cmd_endpoint_out = 0
 		self._usb_sd_endpoint_in = 0
@@ -206,11 +205,6 @@ class FlashForge(object):
 	def port(self):
 		"""port name. OctoPrint Serial Factory property"""
 		return self._portname
-
-
-	def USB_id(self):
-		""" Get vendor and device USB IDs """
-		return self._usb_vid, self._usb_id
 
 
 	def _valid_command(self, command):
@@ -360,7 +354,7 @@ class FlashForge(object):
 			elif gcode == b"M23":
 				# we started an SD print - make sure to set printer state
 				self._status_time = 0.0
-				data += b"\r\nM119"
+				data += b"\r\n~M119"
 			elif gcode == b"M27":
 				# make sure we have the current printer status before getting SD card progress, because SD card
 				# progress reports printing when cancelled or finished...
@@ -445,26 +439,37 @@ class FlashForge(object):
 		if len(data):
 			if b"CMD M27 " in data:
 				# need to filter out bogus SD print progress from cancelled or paused prints
-				if b"printing byte" in data and self._printerstate in [self.STATE_UNKNOWN, self.STATE_READY, self.STATE_SD_PAUSED]:
+				if b"printing byte" in data:
 					match = FlashForge.regex_SDPrintProgress.search(data)
 					if match:
 						try:
 							current = int(match.group("current"))
-							total = int(match.group("total"))
+							self._sdtotal = int(match.group("total"))
 						except:
 							pass
 						else:
 							# Note: there is an issue with .gx files indicating the current byte size is greater than the
 							# total when the print is started
-							if self._printerstate == self.STATE_READY and current >= total:
+							if self._printerstate == self.STATE_READY and current >= self._sdtotal:
 								# Ultra 3D: after completing print it still indicates SD card progress
 								data = b"CMD M27 Received.\r\nDone printing file\r\nok\r\n"
+							elif self._printerstate in [self.STATE_SD_PAUSED, self.STATE_SD_BUILDING] and \
+								not self._comm.isSdFileSelected():
+								# user manually started a print or we connected while one was running
+								data = b"File opened: SD_printing.gcode Size: %d\r\nok\r\n" % self._sdtotal
 							elif self._printerstate == self.STATE_SD_PAUSED:
-								# when paused still indicates printing
+								# when paused still printer indicates printing so change the response
+								# TODO: there may be a proper way to signal this using "action"?
 								data = b"CMD M27 Received.\r\nPrinting paused\r\nok\r\n"
-							elif self._printerstate != self.STATE_UNKNOWN:
+								if self._comm.isSdPrinting():
+									# this is for when we connect and the printer is printing but paused or the user
+									# manually paused the print using the printer screen. doesn't seem to be a way to
+									# tell OctoPrint the correct state so we do it the dirty way
+									self._comm._changeState(self.STATE_PAUSED)
+							elif self._printerstate != self.STATE_SD_BUILDING:
 								# after print is cancelled M27 always looks like its printing from sd card
 								data = b"CMD M27 Received.\r\nNot SD printing\r\nok\r\n"
+
 				elif not data.strip().endswith(b"ok"):
 					# for Dremel 3D20 not responding correctly when not printing from SD card:
 					if self._printerstate == self.STATE_READY:
@@ -596,7 +601,8 @@ class FlashForge(object):
 			# we got the response from some previous OctoPrint command so parse it into the buffer used for
 			# OctoPrint listener so it will be read later
 			self._parse_response(response)
-		if b"ok\r\n" in response:
+		# note that sometimes the ok response is not terminated with \r\n eg M104 on Dreamer
+		if b"\r\nok" in response:
 			self._logger.debug("sendcommand() got an ok")
 			return True, response
 		return False, response
