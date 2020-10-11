@@ -464,7 +464,7 @@ class FlashForge(object):
 									# this is for when we connect and the printer is printing but paused or the user
 									# manually paused the print using the printer screen. doesn't seem to be a way to
 									# tell OctoPrint the correct state so we do it the dirty way
-									self._comm._changeState(self.STATE_PAUSED)
+									self._comm._changeState(self._comm.STATE_PAUSED)
 							elif self._printerstate != self.STATE_SD_BUILDING:
 								# after print is cancelled M27 always looks like its printing from sd card
 								data = b"CMD M27 Received.\r\nNot SD printing\r\nok\r\n"
