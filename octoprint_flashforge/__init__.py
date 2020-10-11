@@ -343,7 +343,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				self._logger.info("aborting: print already in progress")
 				sd_upload_failed(filename, remote_name, 10)
 				eventManager().fire(Events.ERROR, {"error":  errormsg + " - printer is busy.", "reason": "start_print"})
-				exit()
+				return
 
 			# there must be something coming back from the printer (eg keep alive) or we will block here until the
 			# Octoprint comm monitor readline times out
