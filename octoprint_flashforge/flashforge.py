@@ -66,7 +66,6 @@ class FlashForge(object):
 		self._writelock = threading.Lock()
 		self._printerstate = self.STATE_UNKNOWN
 		self._disconnect_event = False
-		self._sdtotal = 0
 
 		self._noG91 = False
 		self._relative_pos = False
@@ -444,19 +443,19 @@ class FlashForge(object):
 					if match:
 						try:
 							current = int(match.group("current"))
-							self._sdtotal = int(match.group("total"))
+							total = int(match.group("total"))
 						except:
 							pass
 						else:
 							# Note: there is an issue with .gx files indicating the current byte size is greater than the
 							# total when the print is started
-							if self._printerstate == self.STATE_READY and current >= self._sdtotal:
+							if self._printerstate == self.STATE_READY and current >= total:
 								# Ultra 3D: after completing print it still indicates SD card progress
 								data = b"CMD M27 Received.\r\nDone printing file\r\nok\r\n"
 							elif self._printerstate in [self.STATE_SD_PAUSED, self.STATE_SD_BUILDING] and \
 								not self._comm.isSdFileSelected():
 								# user manually started a print or we connected while one was running
-								data = b"File opened: SD_printing.gcode Size: %d\r\nok\r\n" % self._sdtotal
+								data = b"File opened: SD_printing.gcode Size: %d\r\nok\r\n" % total
 							elif self._printerstate == self.STATE_SD_PAUSED:
 								# when paused still printer indicates printing so change the response
 								# TODO: there may be a proper way to signal this using "action"?
