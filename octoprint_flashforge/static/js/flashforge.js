@@ -38,6 +38,7 @@ $(function () {
 			} else {
 				self.setLed(self.ledColor());
 				self.pickerButton.textContent = self.pickerButton.originalText;
+    			self.saveData();
 			}
 		}
 
@@ -155,7 +156,7 @@ $(function () {
 			if (self.ledStatus())
 				self.setLed(self.ledColor())
 			else
-				self.setLed(0, 0, 0);
+				self.setLed([0, 0, 0]);
 		}
 	}
 
