@@ -295,7 +295,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M110":
 				# if we connected and the printer is already printing then trigger an M27 so we can trigger a file open
 				# for OctoPrint
-				if self._serial_obj.is_printing() and not self._comm.isSdFileSelected():
+				if self._serial_obj.is_sd_printing() and not self._comm.isSdFileSelected():
 					cmd = ["M27"]
 				else:
 					cmd = []
@@ -305,7 +305,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				cmd = []
 
 			# M146 = set LED colors: do not send while printing from SD (does not work, may cause issues)
-			elif gcode == "M146" and self._serial_obj.is_printing():
+			elif gcode == "M146" and self._serial_obj.is_sd_printing():
 				cmd = []
 
 			# M190 in Marlin = wait for bed temp : M7 in FlashForge
@@ -340,7 +340,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			# TODO: should be able to remove this if we can detect and notify if a print job is running when we connect
 			#  to the printer or if the job is started manually on the printer display
-			if self._serial_obj.is_printing():
+			if self._serial_obj.is_sd_printing():
 				self._logger.info("aborting: print already in progress")
 				sd_upload_failed(filename, remote_name, timer()-start)
 				eventManager().fire(Events.ERROR, {"error":  errormsg + " - printer is busy.", "reason": "start_print"})

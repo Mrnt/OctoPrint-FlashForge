@@ -29,7 +29,7 @@ class FlashForge(object):
 	STATE_BUSY = 6
 	STATE_WAIT_ON_TEMP = 7
 
-	PRINTING_STATES = [STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED, STATE_HOMING]
+	PRINTING_STATES = [STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED]
 
 	regex_SDPrintProgress = re.compile(b"(?P<current>[0-9]+)/(?P<total>[0-9]+)")
 	""" Regex matching SD print progress from M27. """
@@ -327,10 +327,10 @@ class FlashForge(object):
 			# special handling for relative positioning support
 			if gcode in [b"G0", b"G1"] and self._noG91 and self._relative_pos:
 				# try to convert relative positioning to absolute
-				self._logger.debug("G1 with rel pos")
+				self._logger.debug("G0/G1 with rel pos")
 				match = FlashForge.regex_g1.search(data)
 				if match:
-					self._logger.debug("G1 {0}".format(match.groupdict()))
+					self._logger.debug("G1 {}".format(match.groupdict()))
 					data = b"G1"
 					for k, v in match.groupdict().items():
 						if v != None:
@@ -512,6 +512,7 @@ class FlashForge(object):
 						# printing directly and printer waiting for bed or extruder to heat up
 						self._printerstate = self.STATE_WAIT_ON_TEMP
 					else:
+						# moving or homing
 						self._printerstate = self.STATE_BUSY
 				elif b"MachineStatus: BUILDING_FROM_SD" in data:
 					if b"MoveMode: PAUSED" in data:
