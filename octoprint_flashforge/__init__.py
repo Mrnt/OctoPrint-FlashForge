@@ -216,8 +216,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			self._logger.debug("rewrite_gcode(): gcode:{}, cmd:{}".format(gcode, cmd))
 
-			# TODO: detect printer state earlier in connection process and dont send M146, etc if the printer
-			# is already busy when we connect
+			# TODO: detect printer state earlier in connection process and don't send M146, etc if the printer
+			#  is already busy when we connect
 			# TODO: filter M146 and other commands? when printing from SD because they cause comms to hang
 
 			# allow a very limited set of commands while printing from SD to minimize problems...
@@ -329,6 +329,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 		Note the filename can contain a sub-folder path to the place on OctoPrint where the file is located!
 		"""
+		from timeit import default_timer as timer
 
 		if not self._serial_obj:
 			return
@@ -341,7 +342,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			#  to the printer or if the job is started manually on the printer display
 			if self._serial_obj.is_printing():
 				self._logger.info("aborting: print already in progress")
-				sd_upload_failed(filename, remote_name, 10)
+				sd_upload_failed(filename, remote_name, timer()-start)
 				eventManager().fire(Events.ERROR, {"error":  errormsg + " - printer is busy.", "reason": "start_print"})
 				return
 
@@ -390,7 +391,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 						if result and b"CMD M28" in response:
 							response = self._serial_obj.readraw(1000)
 						if result and b"failed" not in response:
-							sd_upload_succeeded(filename, remote_name, 10)
+							sd_upload_succeeded(filename, remote_name, timer()-start)
 						else:
 							error = "file transfer incomplete"
 
@@ -401,7 +402,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			if error:
 				self._logger.info("Upload failed: {}".format(error))
-				sd_upload_failed(filename, remote_name, 10)
+				sd_upload_failed(filename, remote_name, timer()-start)
 				self._serial_obj.makeexclusive(False)
 				self._serial_obj.enable_keep_alive(True)
 				eventManager().fire(Events.ERROR, {"error": errormsg, "reason": "start_print"})
@@ -416,6 +417,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 		# TODO: test printer status and do not proceed if not ready - eg homing after cancelling an SD print
 
+		start = timer()
 		# Unfortunately we cannot get the list of files on the SD card from FlashForge so we just name the remote
 		# file the same as the source and hope for the best
 		bgcode = b""
@@ -433,7 +435,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		except:
 			errormsg = "could not open local file."
 			self._logger.info("aborting: " + errormsg)
-			sd_upload_failed(filename, remote_name, 10)
+			sd_upload_failed(filename, remote_name, timer()-start)
 			eventManager().fire(Events.ERROR, {"error": errormsg, "reason": "start_print"})
 		else:
 			thread = threading.Thread(target=process_upload, name="FlashForge.SD_Uploader")
