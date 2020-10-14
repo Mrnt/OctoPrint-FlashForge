@@ -1,5 +1,16 @@
 # OctoPrint-FlashForge Changelog
 
+
+## 0.2.5 (2020-10-13)
+### New Feature
+* Can connect to printer when it is already printing from SD and OctoPrint will recognize a print is in progress
+* Provide error dialogs if "Upload to SD" fails
+### Bug Fixes
+* Save the LED color change so it carries over between OctoPrint restarts
+* Do not send M20 (get list of files on SD card), M21 (initialize the SD card) commands since they do not do anything
+and for some printers may cause issues.
+* Try to allow XY homing on Finder v2. #29
+
 ## 0.2.4 (2020-09-21)
 ### New Feature
 * Can have more than one printer of the same type connected - the "Serial Port" name will contain the printer name

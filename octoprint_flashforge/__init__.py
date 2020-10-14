@@ -24,13 +24,19 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 					   octoprint.plugin.AssetPlugin,
 					   octoprint.plugin.TemplatePlugin):
 	VENDOR_IDS = {0x0315: "PowerSpec", 0x2a89: "Dremel", 0x2b71: "FlashForge"}
-	PRINTER_IDS = {
-		"PowerSpec": {0x0001: "Ultra 3DPrinter (C)"},
-		"Dremel": {0x8889: "Dremel IdeaBuilder 3D20", 0x888d: "Dremel IdeaBuilder 3D45"},
-		"FlashForge": {0x0001: "Dreamer", 0x0002: "Finder v1", 0x0004: "Guider II", 0x0005: "Inventor",
-					   0x0007: "Finder v2", 0x0009: "Guider IIs", 0x000A: "Dreamer NX",
-					   0x00e7: "Creator Max", 0x00ee: "Finder v2.12",
-					   0x00f6: "PowerSpec Ultra 3DPrinter (B)", 0x00ff: "PowerSpec Ultra 3DPrinter (A)"}}
+	PRINTER_PROFILES = {
+		0x0315: {
+			0x0001: {"name": "Ultra 3DPrinter (C)"}},  # PowerSpec
+		0x2a89: {
+			0x8889: {"name": "Dremel IdeaBuilder 3D20"}, 0x888d: {"name": "Dremel IdeaBuilder 3D45"}},  # Dremel
+		0x2b71: {
+			0x0001: {"name": "Dreamer"}, 0x0002: {"name": "Finder v1"},  # FlashForge
+			0x0004: {"name": "Guider II"}, 0x0005: {"name": "Inventor"},
+			0x0007: {"name": "Finder v2", "noG28XY": True, "noM132": True},
+			0x0009: {"name": "Guider IIs"}, 0x000A: {"name": "Dreamer NX"},
+			0x00e7: {"name": "Creator Max"}, 0x00ee: {"name": "Finder v2.12"},
+			0x00f6: {"name": "PowerSpec Ultra 3DPrinter (B)"},
+			0x00ff: {"name": "PowerSpec Ultra 3DPrinter (A)"}}}
 	FILE_PACKET_SIZE = 1024
 
 
@@ -44,6 +50,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._currentFile = None
 		self._usbcontext = None
 		self._printers = {}
+		self._printer_profile = {}
 		# FlashForge friendly default connection settings
 		self._conn_settings = {
 			'firmwareDetection': False,				# do not try to auto detect firmware
@@ -79,8 +86,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	##~~ AssetPlugin mixin
 	def get_assets(self):
-		# Define your plugin's asset files to automatically include in the
-		# core UI here.
+		# List of plugin asset files to automatically include in the core UI.
 		return dict(
 			js=["js/flashforge.js", "js/color-picker.min.js"],
 			css=["css/color-picker.min.css"]
@@ -89,9 +95,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 	##~~ Softwareupdate hook
 	def get_update_information(self):
-		# Define the configuration for your plugin to use with the Software Update
-		# Plugin here. See https://github.com/foosel/OctoPrint/wiki/Plugin:-Software-Update
-		# for details.
+		# Plugin specific configuration to use with the Software Update Plugin.
+		# See https://github.com/foosel/OctoPrint/wiki/Plugin:-Software-Update for details.
 		return dict(
 			flashforge=dict(
 				displayName="FlashForge Plugin",
@@ -155,6 +160,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._comm = comm
 		serial_obj = flashforge.FlashForge(self, comm, self._usbcontext, portname, self._printers[portname],
 										   read_timeout=float(read_timeout))
+		if self._printers[portname]["did"] in self.PRINTER_PROFILES[self._printers[portname]["vid"]]:
+			self._printer_profile = self.PRINTER_PROFILES[self._printers[portname]["vid"]][self._printers[portname]["did"]]
+		else:
+			self._printer_profile = {}
 		return serial_obj
 
 
@@ -227,10 +236,9 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			# homing
 			elif gcode == "G28":
 				cmd = cmd.replace('0', '')
-				if self.G91_disabled() and cmd == "G28 X Y":
+				if cmd == "G28 X Y" and "noG28XY" in self._printer_profile:
 					# F2G2: does not support "G28 X Y"?
-					# F2 needs first G28 to finish or it will ignore the second one
-					cmd = ["G28 X", "M400", "G28 Y"]
+					cmd = ["G28 X", "G28 Y"]
 
 			# relative positioning
 			elif gcode == "G91":
@@ -304,6 +312,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif gcode == "M119":
 				cmd = []
 
+			# M132 load default positions does not work at command line for some printers
+			elif gcode == "M132" and "noM132" in self._printer_profile:
+				cmd = []
+
 			# M146 = set LED colors: do not send while printing from SD (does not work, may cause issues)
 			elif gcode == "M146" and self._serial_obj.is_sd_printing():
 				cmd = []
@@ -339,8 +351,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			errormsg = "Unable to upload to SD card"
 
 			# TODO: should be able to remove this if we can detect and notify if a print job is running when we connect
-			#  to the printer or if the job is started manually on the printer display
-			if self._serial_obj.is_sd_printing():
+			#  to the printer or if the job is started manually on the printer display because we should never get this far
+			if not self._serial_obj.is_ready():
 				self._logger.info("aborting: print already in progress")
 				sd_upload_failed(filename, remote_name, timer()-start)
 				eventManager().fire(Events.ERROR, {"error":  errormsg + " - printer is busy.", "reason": "start_print"})

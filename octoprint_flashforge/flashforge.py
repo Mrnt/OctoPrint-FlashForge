@@ -511,6 +511,9 @@ class FlashForge(object):
 					elif b"MoveMode: WAIT_ON_TOOL" in data or b"MoveMode: WAIT_ON_PLATFORM" in data:
 						# printing directly and printer waiting for bed or extruder to heat up
 						self._printerstate = self.STATE_WAIT_ON_TEMP
+					elif b"MoveMode: HOMING" in data:
+						# printing directly and printer waiting for bed or extruder to heat up
+						self._printerstate = self.STATE_HOMING
 					else:
 						# moving or homing
 						self._printerstate = self.STATE_BUSY
