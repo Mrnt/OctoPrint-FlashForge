@@ -29,7 +29,7 @@ class FlashForge(object):
 	STATE_BUSY = 6
 	STATE_WAIT_ON_TEMP = 7
 
-	PRINTING_STATES = [STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED, STATE_HOMING]
+	PRINTING_STATES = [STATE_BUILDING, STATE_SD_BUILDING, STATE_SD_PAUSED]
 
 	regex_SDPrintProgress = re.compile(b"(?P<current>[0-9]+)/(?P<total>[0-9]+)")
 	""" Regex matching SD print progress from M27. """
@@ -327,10 +327,10 @@ class FlashForge(object):
 			# special handling for relative positioning support
 			if gcode in [b"G0", b"G1"] and self._noG91 and self._relative_pos:
 				# try to convert relative positioning to absolute
-				self._logger.debug("G1 with rel pos")
+				self._logger.debug("G0/G1 with rel pos")
 				match = FlashForge.regex_g1.search(data)
 				if match:
-					self._logger.debug("G1 {0}".format(match.groupdict()))
+					self._logger.debug("G1 {}".format(match.groupdict()))
 					data = b"G1"
 					for k, v in match.groupdict().items():
 						if v != None:
@@ -353,7 +353,7 @@ class FlashForge(object):
 			elif gcode == b"M23":
 				# we started an SD print - make sure to set printer state
 				self._status_time = 0.0
-				data += b"\r\nM119"
+				data += b"\r\n~M119"
 			elif gcode == b"M27":
 				# make sure we have the current printer status before getting SD card progress, because SD card
 				# progress reports printing when cancelled or finished...
@@ -438,7 +438,7 @@ class FlashForge(object):
 		if len(data):
 			if b"CMD M27 " in data:
 				# need to filter out bogus SD print progress from cancelled or paused prints
-				if b"printing byte" in data and self._printerstate in [self.STATE_UNKNOWN, self.STATE_READY, self.STATE_SD_PAUSED]:
+				if b"printing byte" in data:
 					match = FlashForge.regex_SDPrintProgress.search(data)
 					if match:
 						try:
@@ -452,12 +452,23 @@ class FlashForge(object):
 							if self._printerstate == self.STATE_READY and current >= total:
 								# Ultra 3D: after completing print it still indicates SD card progress
 								data = b"CMD M27 Received.\r\nDone printing file\r\nok\r\n"
+							elif self._printerstate in [self.STATE_SD_PAUSED, self.STATE_SD_BUILDING] and \
+								not self._comm.isSdFileSelected():
+								# user manually started a print or we connected while one was running
+								data = b"File opened: SD_printing.gcode Size: %d\r\nok\r\n" % total
 							elif self._printerstate == self.STATE_SD_PAUSED:
-								# when paused still indicates printing
+								# when paused still printer indicates printing so change the response
+								# TODO: there may be a proper way to signal this using "action"?
 								data = b"CMD M27 Received.\r\nPrinting paused\r\nok\r\n"
-							elif self._printerstate != self.STATE_UNKNOWN:
+								if self._comm.isSdPrinting():
+									# this is for when we connect and the printer is printing but paused or the user
+									# manually paused the print using the printer screen. doesn't seem to be a way to
+									# tell OctoPrint the correct state so we do it the dirty way
+									self._comm._changeState(self._comm.STATE_PAUSED)
+							elif self._printerstate != self.STATE_SD_BUILDING:
 								# after print is cancelled M27 always looks like its printing from sd card
 								data = b"CMD M27 Received.\r\nNot SD printing\r\nok\r\n"
+
 				elif not data.strip().endswith(b"ok"):
 					# for Dremel 3D20 not responding correctly when not printing from SD card:
 					if self._printerstate == self.STATE_READY:
@@ -500,7 +511,11 @@ class FlashForge(object):
 					elif b"MoveMode: WAIT_ON_TOOL" in data or b"MoveMode: WAIT_ON_PLATFORM" in data:
 						# printing directly and printer waiting for bed or extruder to heat up
 						self._printerstate = self.STATE_WAIT_ON_TEMP
+					elif b"MoveMode: HOMING" in data:
+						# printing directly and printer waiting for bed or extruder to heat up
+						self._printerstate = self.STATE_HOMING
 					else:
+						# moving or homing
 						self._printerstate = self.STATE_BUSY
 				elif b"MachineStatus: BUILDING_FROM_SD" in data:
 					if b"MoveMode: PAUSED" in data:
@@ -535,12 +550,6 @@ class FlashForge(object):
 				for i, line in enumerate(datalines):
 					self._logger.debug("buffering: {}".format(line))
 					self._incoming.put(line)
-
-					# if M20 (list SD card files) does not return anything, make it look like an empty file list
-					if b"CMD M20 " in line and datalines[i+1] and datalines[i+1] == b"ok":
-						# fetch SD card list does not get anything so fake out a result
-						self._incoming.put(b"Begin file list")
-						self._incoming.put(b"End file list")
 			else:
 				self._incoming.put(data)
 
@@ -595,7 +604,8 @@ class FlashForge(object):
 			# we got the response from some previous OctoPrint command so parse it into the buffer used for
 			# OctoPrint listener so it will be read later
 			self._parse_response(response)
-		if b"ok\r\n" in response:
+		# note that sometimes the ok response is not terminated with \r\n eg M104 on Dreamer
+		if b"\r\nok" in response:
 			self._logger.debug("sendcommand() got an ok")
 			return True, response
 		return False, response
