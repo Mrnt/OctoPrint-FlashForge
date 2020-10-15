@@ -352,6 +352,7 @@ class FlashForge(object):
 					data = b"G90"
 			elif gcode == b"M23":
 				# we started an SD print - make sure to set printer state
+				self._printerstate = self.STATE_SD_BUILDING
 				self._status_time = 0.0
 				data += b"\r\n~M119"
 			elif gcode == b"M27":
