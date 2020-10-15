@@ -254,6 +254,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif (gcode == "M20" or gcode == "M21"):
 				cmd = []
 
+			# M23 = select (and start printing) sd file
+			elif gcode == "M23":
+				# if the file path is incorrect (eg it came from Cura) then ignore the command
+				if "M23 /" in cmd:
+					cmd = []
+
 			# M25 = pause
 			elif gcode == "M25":
 				# pause during cancel causes issues
