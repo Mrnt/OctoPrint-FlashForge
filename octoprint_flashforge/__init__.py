@@ -364,13 +364,13 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.enable_keep_alive(False)
 
 			# make sure heaters are off
-			ok, answer = self._serial_obj.sendcommand(b"M104 S0 T0", 1)
+			ok, answer = self._serial_obj.sendcommand(b"M104 S0 T0")
 			if not ok:
 				error = "{}: {}".format(errormsg, answer)
 				errormsg += " - printer busy."
 			else:
-				self._serial_obj.sendcommand(b"M104 S0 T1", 1)
-				self._serial_obj.sendcommand(b"M140 S0", 1)
+				self._serial_obj.sendcommand(b"M104 S0 T1")
+				self._serial_obj.sendcommand(b"M140 S0")
 
 				ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
 				if not ok or b"open failed" in answer:

@@ -1,6 +1,10 @@
 # OctoPrint-FlashForge Changelog
 
 
+## 0.2.6 (2020-10-15)
+### Bug Fixes
+* Regression bug - made Upload to SD error checking too aggressive causing it to fail on some printers.
+
 ## 0.2.5 (2020-10-13)
 ### New Feature
 * Can connect to printer when it is already printing from SD and OctoPrint will recognize a print is in progress
