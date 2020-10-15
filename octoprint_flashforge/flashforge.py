@@ -563,6 +563,9 @@ class FlashForge(object):
 		"""
 		Read everything available from the from the printer
 
+		Parameters:
+			timeout : max time to wait in ms
+
 		Returns:
 			String containing response from the printer
 		"""
@@ -585,7 +588,20 @@ class FlashForge(object):
 		return data
 
 
-	def sendcommand(self, cmd, timeout=-1, readresponse=True):
+	def sendcommand(self, cmd, timeout=1000, readresponse=True):
+		"""
+		Send g-code to printer and wait for a response
+
+		Parameters:
+			cmd : FF formatted g-code command
+			timeout : max time to wait in ms
+			readresponse : true to return printer response
+
+		Returns:
+			True if printer responded with ok, indicating command was accepted
+			Optional : string containing response from the printer
+		"""
+
 		self._logger.debug("sendcommand() {}".format(cmd.decode()))
 
 		self.writeraw(b"~%s\r\n" % cmd)

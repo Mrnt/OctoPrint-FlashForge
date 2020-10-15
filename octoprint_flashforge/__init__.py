@@ -254,6 +254,12 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			elif (gcode == "M20" or gcode == "M21"):
 				cmd = []
 
+			# M23 = select (and start printing) sd file
+			elif gcode == "M23":
+				# if the file path is incorrect (eg it came from Cura) then ignore the command
+				if "M23 /" in cmd:
+					cmd = []
+
 			# M25 = pause
 			elif gcode == "M25":
 				# pause during cancel causes issues
@@ -364,13 +370,13 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.enable_keep_alive(False)
 
 			# make sure heaters are off
-			ok, answer = self._serial_obj.sendcommand(b"M104 S0 T0", 1)
+			ok, answer = self._serial_obj.sendcommand(b"M104 S0 T0")
 			if not ok:
 				error = "{}: {}".format(errormsg, answer)
 				errormsg += " - printer busy."
 			else:
-				self._serial_obj.sendcommand(b"M104 S0 T1", 1)
-				self._serial_obj.sendcommand(b"M140 S0", 1)
+				self._serial_obj.sendcommand(b"M104 S0 T1")
+				self._serial_obj.sendcommand(b"M140 S0")
 
 				ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
 				if not ok or b"open failed" in answer:
