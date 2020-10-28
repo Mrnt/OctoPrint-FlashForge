@@ -155,9 +155,7 @@ the printer - see error message in the Terminal tab of Octoprint for instruction
 * Verify that the Serial Connection settings are set correctly, in particular the "Send a checksum with the command"
 setting.
 
-* Turn on debug messages for the plugin (Settings > Logging, under "Logging Levels" set
-[octoprint.plugins.flashforge](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/images/LoggingSettings.png) to "DEBUG"
-and then click the "+" sign next to it, then click "Save") to help troubleshoot connection issues.
+* Turn on debug messages for the plugin (see Debugging below) to help troubleshoot connection issues.
 
 * After attempting to connect to the printer with debug messages turned on, review the log (Settings > Logging,
 octoprint.log) for clues. If you cannot resolve it, create an
@@ -168,6 +166,14 @@ hardware (PC/Raspberry Pi 3b/etc), Printer Model, Printer Firmware Version and u
 seem to work,
 there is a setting under "Settings" > "Printer Profiles" > "Axes" where you can select G91 (relative positioning) not
 supported.
+
+
+## Debugging
+Turn on debug messages for the plugin by going to Settings > Logging and under "Logging Levels" set `octoprint.plugins.flashforge` to "DEBUG"
+![](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/images/LoggingSettings.png)
+
+**IMPORTANT**: click the "+" sign next to it, then click "Save".
+
 
 ## Support Further Development
 
