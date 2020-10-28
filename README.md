@@ -5,7 +5,7 @@ printers such as the:
 - FlashForge Creator Max, FlashForge Dreamer, FlashForge Dreamer NX, FlashForge Finder, FlashForge Finder II, FlashForge
 Guider II, FlashForge Guider IIs, FlashForge Inventor, FlashForge Ultra 2.0
 - PowerSpec Ultra 3DPrinter 2.0
-- Dremel Idea Builder 3D20, 3D45
+- Dremel Idea Builder 3D20, 3D40, 3D45
 
 At the current time, plugin will only work with printers that support a connection to a host computer (eg RaspberryPi)
 via a USB connection (using a USB type B connector on the printer).
