@@ -170,6 +170,7 @@ supported.
 
 ## Debugging
 Turn on debug messages for the plugin by going to Settings > Logging and under "Logging Levels" set `octoprint.plugins.flashforge` to "DEBUG"
+
 ![](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/images/LoggingSettings.png)
 
 **IMPORTANT**: click the "+" sign next to it, then click "Save".
