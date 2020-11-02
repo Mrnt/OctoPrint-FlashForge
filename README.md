@@ -49,20 +49,21 @@ feedback.
 |Dreamer			|Yes					|?									|?								|
 |Dreamer NX			|Yes					|?									|?								|
 |Finder v1			|Yes					|Yes								|Yes							|
-|Finder v2			|Yes					|Temp - Yes, Movement - ?			|?								|
+|Finder v2*			|Yes					|Temp - Yes, Movement - ?			|?								|
 |Explorer			|Yes					|?									|?								|
 |Guider				|Yes					|?									|?								|
-|Guider II			|Yes					|Temp - Yes, Movement - ?			|?								|
-|Guider II S		|Yes					|Temp - Yes, Movement - ?			|?								|
+|Guider II*			|Yes					|Temp - Yes, Movement - ?			|?								|
+|Guider II S*		|Yes					|Temp - Yes, Movement - ?			|?								|
 |Inventor			|Yes					|?									|?								|
 |Inventor II		|Yes					|?									|?								|
 |Dremel 3D20		|Yes					|?									|?								|
-|Dremel 3D40		|Yes					|?									|?								|
-|Dremel 3D45		|Yes					|?									|?								|
+|Dremel 3D40**		|?					|?									|?								|
+|Dremel 3D45**		|?					|?									|?								|
 |PowerSpec Ultra 3d	|Yes					|Yes								|Yes							|
 
 \* May be issues with FlashForge Finder II, Guider II, Guider IIs - these printers do not support relative positioning
 so when you create your Printer Profile in OctoPrint you will need to go to the "Axes" tab and select "G91 Not Supported". If you still experience issues when using the controls please report with debug log files (see below for how to enable debugging).
+\** Dremel 3D40, 3D45 seem to talk a little differently from the other printers and cannot be controlled directly. At the present time upload to SD card is not working either.
 
 
 ## Install
