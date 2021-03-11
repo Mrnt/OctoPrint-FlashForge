@@ -34,6 +34,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			0x0004: {"name": "Guider II"}, 0x0005: {"name": "Inventor"},
 			0x0007: {"name": "Finder v2", "noG28XY": True, "noM132": True},
 			0x0009: {"name": "Guider IIs"}, 0x000A: {"name": "Dreamer NX"},
+			0x000e: {"name": "Creator Pro 2"},
 			0x00e7: {"name": "Creator Max"}, 0x00ee: {"name": "Finder v2.12"},
 			0x00f6: {"name": "PowerSpec Ultra 3DPrinter (B)"},
 			0x00ff: {"name": "PowerSpec Ultra 3DPrinter (A)"}}}
