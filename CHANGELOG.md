@@ -1,5 +1,99 @@
 # OctoPrint-FlashForge Changelog
 
+
+## 0.2.6 (2020-10-15)
+### Bug Fixes
+* Regression bug - made Upload to SD error checking too aggressive causing it to fail on some printers.
+
+## 0.2.5 (2020-10-13)
+### New Feature
+* Can connect to printer when it is already printing from SD and OctoPrint will recognize a print is in progress
+* Provide error dialogs if "Upload to SD" fails
+### Bug Fixes
+* Save the LED color change so it carries over between OctoPrint restarts
+* Do not send M20 (get list of files on SD card), M21 (initialize the SD card) commands since they do not do anything
+and for some printers may cause issues.
+* Try to allow XY homing on Finder v2. #29
+
+## 0.2.4 (2020-09-21)
+### New Feature
+* Can have more than one printer of the same type connected - the "Serial Port" name will contain the printer name
+and USB port#
+* Try to handle emergency stop M112 (some of the time it still leaves the printer/USB stack in a unstable state)
+### Bug Fixes
+* Regression bug - On new RPi installs, may not be able to connect and get message about setting up USB permissions #51
+* Cannot create new Printer Profile with this plugin installed. #52
+
+## 0.2.3 (2020-09-12)
+### Bug Fixes
+* Regression bug - After upload to SD card the Pause, Cancel controls are sometimes not enabled.
+
+## 0.2.2 (2020-08-27)
+### Bug Fixes
+* Dremel 3D20 should not drop connection (was timing out after 2s of nothing from host).
+
+## 0.2.1 (2020-08-23)
+### Bug Fixes
+* LED control now working.
+* Support for X, Y, Z and extruder movement under the "Control" tab for printers such as Finder II, Guider II which
+do not support relative positioning. There is a setting under "Settings" > "Printer Profiles" > "Axes" where you can
+select G91 not supported.
+
+## 0.2.0 (2020-08-22)
+### New Feature
+* Support printing directly from OctoPrint - ie should now be able to print from within OctoPrint and see progress
+using the "GCode Viewer" tab. While this feature has been tested, it has only been tested on two different printers -
+please provide feedback with debug logs if you are seeing issues.
+### Bug Fixes
+* Better support for Dremel 3D20 timeout issue when handling M27 while not printing.
+
+## 0.1.22 (2020-8-20)
+### Bug Fixes
+* Do not get SD card print status M27 when connecting - Dremel 3D20 does not handle it correctly unless it is actually printing (Thanks @eduncan911)
+
+## 0.1.21 (2020-8-14)
+### New Feature
+* List detected printer in the OctoPrint Serial Port drop list (Thanks @trejan)
+
+## 0.1.20 (2020-8-14)
+### Fix
+* Fix for not being able to connect under OctoPrint 1.4.1 (Thanks @trejan)
+
+## 0.1.19 (2020-7-6)
+### New Features
+* Allow connection to FlashForge Guider II (Thanks @maesoph)
+* Allow connection to Dremel 3D45 (Thanks @garyriet)
+
+## 0.1.18 (2020-5-15)
+### New Features
+* Allow connection to FlashForge Guider IIs (Thanks @jayceekeys)
+### Fixes
+* Support Python 3
+* Disable light controls when printing from SD
+
+## 0.1.17 (2020-5-13)
+### New Features
+* Controls for the enclosure light added to the "Control" tab
+### Fixes
+* Now it should actually support .3drem files for Dremel printers...
+* Support M146 command for controlling LED lights (see [Wiki](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary#m146---control-enclosure-lights)) for docs)
+
+## 0.1.16 (2020-5-8)
+* Support .3drem files for Dremel printers
+* Fix for hanging when DisplayLayerProgress plugin is in use (Thanks @jumpingmushroom)
+
+## 0.1.15 (2020-5-4)
+* Fixes for issues uploading to SD card on newer printers such as Finder v2 (Thanks @boozecouncil)
+
+## 0.1.14 (2020-4-30)
+* Fixes for USB connection issues on newer printers such as Finder v2 (Thanks @boozecouncil)
+
+## 0.1.13 (2020-4-16)
+* Added additional support for PowerSpec Ultra 3D (Thanks @kelkin)
+
+## 0.1.12 (2020-4-16)
+* Added support for FlashForge Finder v2 (Thanks @Spillmaker)
+
 ## 0.1.11 (2020-4-2)
 * Added support for FlashForge Creator Max (Thanks @pfemiani)
 
