@@ -14,6 +14,19 @@ via a USB connection (using a USB type B connector on the printer).
 These printers are not supported by [Octoprint-GPX](https://github.com/markwal/OctoPrint-GPX).  Octoprint-GPX works on
 older printers such as the FlashForge Creator Pro and a few similar printers which use the GPX protocol.
 
+## March 9th 2022 - IMPORTANT PLEASE READ
+**Neither FlashForge or Dremel have provided details of the commands or protocol supported by the various models - almost 
+all the work herein was done by reverse engineering the communication between FlashPrint and the two printers I had access 
+too, trial and error, and subsequently spending many, many hours studying debug logs including those graciously provided by 
+users. 
+However, this is ultimately a losing battle - every new device or firmware change by FlashForge can and has broken the limited 
+capabilities of this plugin. I have therefore made the decision not to spend more time on this plugin. I am grateful to the 
+few users that were generous enough to send me a donation and I hope that they will understand this decision.
+Moving forward, the best solution for FlashForge printers is to use a well documented, open source firmware such as Marlin, 
+which will fully support OctoPrint, Cura, etc. I am working on converting my remaining FlashForge printer to use Marlin firmware
+so that I can focus on using it to its full potential.
+
+
 ## Current Capabilities
 
 - Automatically detect and connect to the above printers
