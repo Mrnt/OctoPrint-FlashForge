@@ -8,6 +8,8 @@ import octoprint.plugin
 from octoprint.settings import default_settings
 from octoprint.util import dict_merge
 from octoprint.events import Events, eventManager
+import octoprint.settings
+
 
 from . import flashforge
 
@@ -63,6 +65,13 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 		self._feature_settings = {
 			'autoUppercaseBlacklist': ['M146']		# LED control requires lowercase r,g,b
 		}
+
+		for setting in self._conn_settings.keys():
+			octoprint.settings.settings().set(['serial', setting], self._conn_settings[setting])
+
+		for setting in self._feature_settings.keys():
+			octoprint.settings.settings().set(["feature", setting], self._feature_settings[setting])
+
 		default_settings["serial"] = dict_merge(default_settings["serial"], self._conn_settings)
 		default_settings["feature"] = dict_merge(default_settings["feature"], self._feature_settings)
 
