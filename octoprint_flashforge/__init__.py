@@ -42,6 +42,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			0x00ff: {"name": "PowerSpec Ultra 3DPrinter (A)"}}}
 	FILE_PACKET_SIZE = 1024
 
+	SPECIAL_SD_HANDLING = ["Creator Pro 2"]
+
 
 	def __init__(self):
 		import logging
@@ -388,7 +390,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 				self._serial_obj.sendcommand(b"M104 S0 T1")
 				self._serial_obj.sendcommand(b"M140 S0")
 
-				ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
+				if self._printer_profile['name'] in SPECIAL_SD_HANDLING:
+					ok, answer = self._serial_obj.sendcommand(b"M28 %d 1:%s" % (file_size, remote_name.encode()), 5000)
+				else:
+					ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
 				if not ok or b"open failed" in answer:
 					error = "{}: {}".format(errormsg, answer)
 					errormsg += " - could not create file on printer SD card."
@@ -439,7 +444,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.makeexclusive(False)
 			self._serial_obj.enable_keep_alive(True)
 			# NB M23 select will also trigger a print on FlashForge
-			self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
+			if self._printer_profile['name'] in SPECIAL_SD_HANDLING:
+				self._comm.selectFile("1:%s\r\n" % remote_name, True)
+			else:	
+				self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
 			# TODO: need to set the correct file size for the progress indicator
 
 
