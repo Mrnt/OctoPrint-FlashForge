@@ -60,7 +60,7 @@ feedback.
 |Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|
 |Creator Max		|?					    |?									|?								|
 |Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
-|Creator Pro 2		|No	(Use GPX plugin)	|Yes                				|Yes (IDEX in development)		|
+|Creator Pro 2		|Yes					|Yes                				|Yes (IDEX in development)		|
 |Dreamer			|Yes					|?									|?								|
 |Dreamer NX			|Yes					|?									|?								|
 |Finder v1			|Yes					|Yes								|Yes							|
