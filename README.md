@@ -50,10 +50,14 @@ Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bu
 
 
 ### Printer Compatibility
+**IMPORTANT:** This plugin uses a USB connection to communicate with the printer - if the printer cannot be connected 
+directly to a computer via USB, then it will not work with this plugin.
+
 Shows current state of printer Compatibility for core OctoPrint functionality and will be updated as users provide
 feedback.
 |Printer			|Upload File to SD Card |Control Movement and Temperature	|Print Directly From OctoPrint	|
 |---				|---					|---								|---							|
+|Adventurer 4		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
 |Adventurer 3		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
 |Adventurer 3C		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
 |Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|
