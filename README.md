@@ -50,24 +50,24 @@ Ultra 3D, FlashForge Finder v1) - please tread carefully and provide detailed bu
 
 
 ### Printer Compatibility
-**IMPORTANT:** This plugin uses a USB connection to communicate with the printer - if the printer cannot be connected 
-directly to a computer via USB, then it will not work with this plugin.
+**IMPORTANT: This plugin uses a USB connection to communicate with the printer - if the printer cannot be connected 
+directly to a computer via USB, then it will not work with this plugin.**
 
 Shows current state of printer Compatibility for core OctoPrint functionality and will be updated as users provide
 feedback.
 |Printer			|Upload File to SD Card |Control Movement and Temperature	|Print Directly From OctoPrint	|
 |---				|---					|---								|---							|
-|Adventurer 4		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
-|Adventurer 3		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
-|Adventurer 3C		|No (no USB port)		|No (no USB port)					|No (no USB port)				|
-|Adventurer 3 Lite	|No (no USB port)		|No (no USB port)					|No (no USB port)				|
-|Creator 3			|No (no USB port)		|No (no USB port)					|No (no USB port)				|
-|Creator Max		|?					    |?									|?								|
+|Adventurer 4 <br>**Not supported** *(no USB to host port)*|-|-|-|
+|Adventurer 3 <br>**Not supported** *(no USB to host port)*|-|-|-|
+|Adventurer 3C <br>**Not supported** *(no USB to host port)*|-|-|-|
+|Adventurer 3 <br>**Not supported** *(no USB to host port)*|-|-|-|
+|Creator 3 <br>**Not supported** *(no USB to host port)*|-|-|-|
+|Creator Max		|Yes				    |Yes								|Yes, unreliably				|
 |Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
 |Creator Pro 2		|No	(Use GPX plugin)	|Yes                				|Yes (IDEX in development)		|
 |Dreamer			|Yes					|?									|?								|
 |Dreamer NX			|Yes					|?									|?								|
-|Finder v1			|Yes					|Yes								|Yes							|
+|Finder v1			|Yes					|Yes								|Yes, unreliably				|
 |Finder v2*			|Yes					|Temp - Yes, Movement - ?			|?								|
 |Explorer			|Yes					|?									|?								|
 |Guider				|Yes					|?									|?								|
@@ -76,9 +76,9 @@ feedback.
 |Inventor			|Yes					|?									|?								|
 |Inventor II		|Yes					|?									|?								|
 |Dremel 3D20		|Yes					|?									|?								|
-|Dremel 3D40**		|?					|?									|?								|
-|Dremel 3D45**		|?					|?									|?								|
-|PowerSpec Ultra 3d	|Yes					|Yes								|Yes							|
+|Dremel 3D40**		|?						|?									|?								|
+|Dremel 3D45**		|?						|?									|?								|
+|PowerSpec Ultra 3d	|Yes					|Yes								|Yes, unreliably				|
 
 \* May be issues with FlashForge Finder II, Guider II, Guider IIs - these printers do not support relative positioning
 so when you create your Printer Profile in OctoPrint you will need to go to the "Axes" tab and select "G91 Not Supported". 
