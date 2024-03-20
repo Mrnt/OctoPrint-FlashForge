@@ -42,6 +42,8 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			0x00ff: {"name": "PowerSpec Ultra 3DPrinter (A)"}}}
 	FILE_PACKET_SIZE = 1024
 
+	SPECIAL_SD_HANDLING = ["Creator Pro 2"]
+
 
 	def __init__(self):
 		import logging
@@ -361,10 +363,15 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 		if not self._serial_obj:
 			return
+			
+		self._logger.debug("upload_to_sd")
+
 
 		def process_upload():
 			error = ""
 			errormsg = "Unable to upload to SD card"
+			
+			self._logger.debug("M28 Upload Handler")
 
 			# TODO: should be able to remove this if we can detect and notify if a print job is running when we connect
 			#  to the printer or if the job is started manually on the printer display because we should never get this far
@@ -381,15 +388,27 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 
 			# make sure heaters are off
 			ok, answer = self._serial_obj.sendcommand(b"M104 S0 T0")
+			
+			
+			self._logger.debug("M28 Upload Handler M104 send")
+			
 			if not ok:
 				error = "{}: {}".format(errormsg, answer)
 				errormsg += " - printer busy."
 			else:
 				self._serial_obj.sendcommand(b"M104 S0 T1")
 				self._serial_obj.sendcommand(b"M140 S0")
-
-				ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
+				self._logger.debug(self._printer_profile['name'])
+				self._logger.debug(self.SPECIAL_SD_HANDLING)
+				if self._printer_profile['name'] in self.SPECIAL_SD_HANDLING:
+					self._logger.debug("M28 FFCP2 Handling")
+					ok, answer = self._serial_obj.sendcommand(b"M28 %d 1:%s" % (file_size, remote_name.encode()), 5000)
+				else:
+					self._logger.debug("M28 Standard Handling")
+					ok, answer = self._serial_obj.sendcommand(b"M28 %d 0:/user/%s" % (file_size, remote_name.encode()), 5000)
+                    
 				if not ok or b"open failed" in answer:
+					self._logger.debug("could not create file on printer sd card")
 					error = "{}: {}".format(errormsg, answer)
 					errormsg += " - could not create file on printer SD card."
 
@@ -439,7 +458,10 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			self._serial_obj.makeexclusive(False)
 			self._serial_obj.enable_keep_alive(True)
 			# NB M23 select will also trigger a print on FlashForge
-			self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
+			if self._printer_profile['name'] in self.SPECIAL_SD_HANDLING:
+				self._comm.selectFile("1:%s\r\n" % remote_name, True)
+			else:	
+				self._comm.selectFile("0:/user/%s\r\n" % remote_name, True)
 			# TODO: need to set the correct file size for the progress indicator
 
 

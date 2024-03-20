@@ -64,7 +64,7 @@ feedback.
 |Creator 3 <br>**Not supported** *(no USB to host port)*|-|-|-|
 |Creator Max		|Yes				    |Yes								|Yes, unreliably				|
 |Creator Pro		|No	(Use GPX plugin)	|No	(Use GPX plugin)				|No	(Use GPX plugin)			|
-|Creator Pro 2		|No	(Use GPX plugin)	|Yes                				|Yes (IDEX in development)		|
+|Creator Pro 2		|Yes					|Yes                				|Yes (printing with 1 extruder, IDEX in development)		|
 |Dreamer			|Yes					|?									|?								|
 |Dreamer NX			|Yes					|?									|?								|
 |Finder v1			|Yes					|Yes								|Yes, unreliably				|
