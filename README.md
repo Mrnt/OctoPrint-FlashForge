@@ -164,7 +164,7 @@ v1.
 if it has not finished "homing".
 * Cannot use any controls (besides Pause, Cancel) while a print is in progress. Temperatures, and printer status CAN be
 monitored because these rely on  *unbuffered* g-code commands - see
-[G Code Commands](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Dictionary) for a list of unbuffered commands
+[G Code Commands](https://github.com/Mrnt/OctoPrint-FlashForge/wiki/G-Code-Reference) for a list of unbuffered commands
 that should work via the Terminal tab when a print is in progress.
 
 ## Troubleshooting
