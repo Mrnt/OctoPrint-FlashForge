@@ -396,6 +396,7 @@ class FlashForgePlugin(octoprint.plugin.SettingsPlugin,
 			if not error:
 				self._logger.debug("M28 file tx started")
 
+
 				try:
 					chunk_start_index = 0
 					while chunk_start_index < file_size:
